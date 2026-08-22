@@ -4,8 +4,8 @@ export function isSuperadmin(user: Pick<SessionUser, "role"> | null | undefined)
   return user?.role === "SUPERADMIN";
 }
 
-export function canHost(user: Pick<SessionUser, "role"> | null | undefined) {
-  return user?.role === "ORGANIZER" || user?.role === "SUPERADMIN";
+export function canHost(user: Pick<SessionUser, "id"> | null | undefined) {
+  return Boolean(user);
 }
 
 export function canManageEvent(

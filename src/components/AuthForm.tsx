@@ -1,0 +1,254 @@
+"use client";
+
+import { useDescope, useSession } from "@descope/nextjs-sdk/client";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { syncDescopeUserAction } from "@/app/actions/auth";
+import {
+  errText,
+  isUserNotFound,
+  jwtFromResp,
+  toE164,
+  urlFromResp,
+} from "@/lib/descope-client";
+
+function finishPath(next: string) {
+  return next || "/";
+}
+
+function afterAuth(next: string, needsName: boolean) {
+  if (needsName) {
+    return `/account?welcome=1&next=${encodeURIComponent(finishPath(next))}`;
+  }
+  return finishPath(next);
+}
+
+export function AuthForm({ next = "/" }: { next?: string }) {
+  const sdk = useDescope();
+  const { isAuthenticated, isSessionLoading } = useSession();
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
+  const [code, setCode] = useState("");
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const finishing = useRef(false);
+
+  async function finish(sessionJwt?: string, extra?: { phone?: string; email?: string }) {
+    const synced = await syncDescopeUserAction({
+      email: extra?.email,
+      phone: extra?.phone,
+      sessionJwt,
+    });
+    if (!synced.ok) {
+      setError(synced.error);
+      finishing.current = false;
+      return false;
+    }
+    router.push(afterAuth(next, synced.needsName));
+    router.refresh();
+    return true;
+  }
+
+  useEffect(() => {
+    if (finishing.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const oauthCode = params.get("code");
+    if (!oauthCode) return;
+    finishing.current = true;
+    setBusy(true);
+    void (async () => {
+      try {
+        const resp = await sdk.oauth.exchange(oauthCode);
+        if (!resp.ok) {
+          setError(errText(resp) || "Google sign-in did not finish.");
+          finishing.current = false;
+          return;
+        }
+        await finish(jwtFromResp(resp));
+      } catch (e) {
+        setError(errText(e));
+        finishing.current = false;
+      } finally {
+        setBusy(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (finishing.current || isSessionLoading || !isAuthenticated) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("code")) return;
+    finishing.current = true;
+    void finish();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, isSessionLoading]);
+
+  async function continueWithGoogle() {
+    setError("");
+    setBusy(true);
+    try {
+      const redirect = `${window.location.origin}/login?next=${encodeURIComponent(finishPath(next))}`;
+      const resp = await sdk.oauth.start("google", redirect);
+      const url = urlFromResp(resp);
+      if (!resp.ok || !url) {
+        setError(errText(resp) || "Could not start Google. Enable the Google connector in Descope.");
+        setBusy(false);
+        return;
+      }
+      window.location.assign(url);
+    } catch (e) {
+      setError(errText(e));
+      setBusy(false);
+    }
+  }
+
+  async function continueWithPassword() {
+    setError("");
+    const loginId = email.trim().toLowerCase();
+    if (!loginId.includes("@") || password.length < 6) {
+      setError("Enter your email and password.");
+      return;
+    }
+    setBusy(true);
+    try {
+      let resp = await sdk.password.signIn(loginId, password);
+      if (!resp.ok && isUserNotFound(resp)) {
+        resp = await sdk.password.signUp(loginId, password, { email: loginId });
+      }
+      if (!resp.ok) {
+        setError(errText(resp) || "Email or password did not work.");
+        return;
+      }
+      finishing.current = true;
+      await finish(jwtFromResp(resp), { email: loginId });
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function sendCode() {
+    setError("");
+    const e164 = toE164(phone);
+    if (e164.length < 10) {
+      setError("Enter a mobile number with country code, e.g. +85255551234.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const resp = await sdk.otp.signUpOrIn.sms(e164);
+      if (!resp.ok) {
+        setError(errText(resp) || "Could not send an SMS. Enable phone OTP in Descope.");
+        return;
+      }
+      setSent(true);
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verifyCode() {
+    setError("");
+    if (code.trim().length < 4) {
+      setError("Enter the SMS code.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const e164 = toE164(phone);
+      const resp = await sdk.otp.verify.sms(e164, code.trim());
+      if (!resp.ok) {
+        setError(errText(resp) || "That code did not work.");
+        return;
+      }
+      finishing.current = true;
+      await finish(jwtFromResp(resp), { phone: e164 });
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-8 space-y-6">
+      {error ? <p className="text-sm text-red-800">{error}</p> : null}
+
+      <button className="btn-line w-full" type="button" disabled={busy} onClick={continueWithGoogle}>
+        Continue with Google
+      </button>
+
+      <div className="space-y-3">
+        <div>
+          <label className="label">Email</label>
+          <input
+            className="field"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="label">Password</label>
+          <input
+            className="field"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+        <button className="btn-gold w-full" type="button" disabled={busy} onClick={continueWithPassword}>
+          {busy ? "Working…" : "Continue with email"}
+        </button>
+      </div>
+
+      <p className="text-center text-xs uppercase tracking-[0.2em] text-[var(--mute)]">or SMS</p>
+
+      <div className="space-y-3">
+        <div>
+          <label className="label">Mobile number</label>
+          <input
+            className="field"
+            type="tel"
+            placeholder="+85255551234"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+        </div>
+        {sent ? (
+          <>
+            <div>
+              <label className="label">One-time code</label>
+              <input
+                className="field"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+              />
+            </div>
+            <button className="btn-gold w-full" type="button" disabled={busy} onClick={verifyCode}>
+              {busy ? "Checking…" : "Continue"}
+            </button>
+            <button className="text-sm underline text-[var(--mute)]" type="button" disabled={busy} onClick={sendCode}>
+              Resend code
+            </button>
+          </>
+        ) : (
+          <button className="btn-gold w-full" type="button" disabled={busy} onClick={sendCode}>
+            {busy ? "Sending…" : "Text me a code"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

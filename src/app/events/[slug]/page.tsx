@@ -100,7 +100,7 @@ export default async function EventPage({
             {!user ? (
               <p className="text-sm text-[var(--mute)]">
                 <Link className="underline" href={`/login?next=/events/${slug}`}>
-                  Sign in with your phone or a social account
+                  Sign in
                 </Link>{" "}
                 first, then you can hold a place.
               </p>
