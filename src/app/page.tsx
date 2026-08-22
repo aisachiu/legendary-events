@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Pill } from "@/components/Pills";
 import { formatMoney, formatWhen } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { eventBlurb } from "@/lib/storage";
 
 export default async function HomePage() {
   const events = await prisma.event.findMany({
@@ -20,7 +21,7 @@ export default async function HomePage() {
       </h1>
       <p className="mt-4 max-w-2xl text-lg text-[var(--mute)]">
         Create an event, take signups from anyone, collect payment receipts, and — for
-        networking nights — open attendee bios only after someone is confirmed.
+        nights with Who&apos;s Going — open attendee cards only after someone is confirmed.
       </p>
       <div className="mt-10 grid gap-5">
         {events.map((event) => (
@@ -28,10 +29,12 @@ export default async function HomePage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="font-serif text-3xl">{event.title}</h2>
-                <p className="mt-1 text-[var(--mute)]">{event.summary}</p>
+                <p className="mt-1 text-[var(--mute)]">
+                  {eventBlurb(event.description, event.summary)}
+                </p>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {event.isNetworking ? <Pill>Networking</Pill> : <Pill tone="mute">Open</Pill>}
+                {event.isNetworking ? <Pill>Who&apos;s Going</Pill> : <Pill tone="mute">Open</Pill>}
                 {event.isPaid ? (
                   <Pill tone="gold">{formatMoney(event.priceCents, event.currency)}</Pill>
                 ) : (

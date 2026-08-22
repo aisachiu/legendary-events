@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser, hashPassword, setSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageEvent, isSuperadmin } from "@/lib/roles";
-import { storeEvidence } from "@/lib/storage";
+import { storePrivateFile } from "@/lib/storage";
 
 async function ensureUser(formData: FormData) {
   const existing = await getCurrentUser();
@@ -33,6 +33,15 @@ async function ensureUser(formData: FormData) {
   return { id: user.id, email: user.email, name: user.name, role: user.role };
 }
 
+function profileFromForm(formData: FormData) {
+  return {
+    preferredName: String(formData.get("preferredName") || "").trim() || null,
+    titlePosition: String(formData.get("titlePosition") || "").trim() || null,
+    introBio: String(formData.get("introBio") || "").trim() || null,
+    linkedinUrl: String(formData.get("linkedinUrl") || "").trim() || null,
+  };
+}
+
 export async function signupAction(formData: FormData) {
   const slug = String(formData.get("slug") || "");
   const event = await prisma.event.findUnique({ where: { slug } });
@@ -47,24 +56,25 @@ export async function signupAction(formData: FormData) {
     );
   }
 
-  const bioHeadline = String(formData.get("bioHeadline") || "").trim() || null;
-  const bioAbout = String(formData.get("bioAbout") || "").trim() || null;
-  const bioCompany = String(formData.get("bioCompany") || "").trim() || null;
-  const bioLinkedin = String(formData.get("bioLinkedin") || "").trim() || null;
-
-  const status = event.isPaid ? "PENDING_PAYMENT" : "CONFIRMED";
+  const profile = profileFromForm(formData);
+  const existing = await prisma.registration.findUnique({
+    where: { eventId_userId: { eventId: event.id, userId: user.id } },
+  });
+  const status =
+    existing?.status === "CONFIRMED"
+      ? "CONFIRMED"
+      : event.isPaid
+        ? "PENDING_PAYMENT"
+        : "CONFIRMED";
 
   const registration = await prisma.registration.upsert({
     where: { eventId_userId: { eventId: event.id, userId: user.id } },
-    update: { bioHeadline, bioAbout, bioCompany, bioLinkedin },
+    update: { ...profile, status },
     create: {
       eventId: event.id,
       userId: user.id,
       status,
-      bioHeadline,
-      bioAbout,
-      bioCompany,
-      bioLinkedin,
+      ...profile,
     },
   });
 
@@ -127,12 +137,18 @@ export async function submitOfflinePaymentAction(formData: FormData) {
     );
   }
 
-  const filename = `${registration.payment.id}${ext}`;
-  const evidencePath = await storeEvidence(
-    filename,
-    Buffer.from(await file.arrayBuffer()),
-    file.type || "application/octet-stream",
-  );
+  let evidencePath: string;
+  try {
+    evidencePath = await storePrivateFile(
+      `evidence/${registration.payment.id}/${Date.now()}${ext}`,
+      Buffer.from(await file.arrayBuffer()),
+      file.type || "application/octet-stream",
+    );
+  } catch {
+    redirect(
+      `/events/${slug}/pay?error=${encodeURIComponent("Could not store that file. Try again with a smaller PNG, JPG, or PDF.")}`,
+    );
+  }
 
   await prisma.payment.update({
     where: { id: registration.payment.id },
@@ -150,7 +166,7 @@ export async function submitOfflinePaymentAction(formData: FormData) {
 export async function saveBioAction(formData: FormData) {
   const slug = String(formData.get("slug") || "");
   const user = await getCurrentUser();
-  if (!user) redirect(`/login?next=/events/${slug}/room`);
+  if (!user) redirect(`/login?next=/events/${slug}/going`);
 
   const event = await prisma.event.findUnique({ where: { slug } });
   if (!event) redirect("/");
@@ -164,15 +180,15 @@ export async function saveBioAction(formData: FormData) {
 
   await prisma.registration.update({
     where: { id: registration.id },
-    data: {
-      bioHeadline: String(formData.get("bioHeadline") || "").trim() || null,
-      bioAbout: String(formData.get("bioAbout") || "").trim() || null,
-      bioCompany: String(formData.get("bioCompany") || "").trim() || null,
-      bioLinkedin: String(formData.get("bioLinkedin") || "").trim() || null,
-    },
+    data: profileFromForm(formData),
   });
 
-  redirect(`/events/${slug}/room`);
+  redirect(`/events/${slug}/going`);
+}
+
+function redirectAfterHost(user: { role: string }, next: string, eventId: string) {
+  if (next.startsWith("/admin") && isSuperadmin(user)) redirect(next);
+  redirect(`/dashboard/events/${eventId}`);
 }
 
 export async function markPaidAction(formData: FormData) {
@@ -212,8 +228,60 @@ export async function markPaidAction(formData: FormData) {
     });
   }
 
-  if (next.startsWith("/admin") && isSuperadmin(user)) {
-    redirect(next);
+  redirectAfterHost(user, next, payment.registration.eventId);
+}
+
+export async function markRefundedAction(formData: FormData) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  const paymentId = String(formData.get("paymentId") || "");
+  const refundNote = String(formData.get("refundNote") || "").trim() || null;
+  const refundAmount = Number(formData.get("refundAmount") || 0);
+  const next = String(formData.get("next") || "");
+  const payment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+    include: { registration: { include: { event: true } } },
+  });
+  if (!payment || !canManageEvent(user, payment.registration.event.organizerId)) {
+    redirect("/dashboard");
   }
-  redirect(`/dashboard/events/${payment.registration.eventId}`);
+
+  await prisma.payment.update({
+    where: { id: payment.id },
+    data: {
+      status: "REFUNDED",
+      refundedAt: new Date(),
+      refundNote,
+      refundAmountCents:
+        refundAmount > 0 ? Math.round(refundAmount * 100) : payment.amountCents,
+    },
+  });
+
+  redirectAfterHost(user, next, payment.registration.eventId);
+}
+
+export async function cancelAttendanceAction(formData: FormData) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  const registrationId = String(formData.get("registrationId") || "");
+  const next = String(formData.get("next") || "");
+  const registration = await prisma.registration.findUnique({
+    where: { id: registrationId },
+    include: { event: true },
+  });
+  if (!registration) redirect("/dashboard");
+
+  const allowed =
+    registration.userId === user.id || canManageEvent(user, registration.event.organizerId);
+  if (!allowed) redirect("/dashboard");
+
+  await prisma.registration.update({
+    where: { id: registration.id },
+    data: { status: "CANCELLED" },
+  });
+
+  if (registration.userId === user.id && !canManageEvent(user, registration.event.organizerId)) {
+    redirect(`/events/${registration.event.slug}`);
+  }
+  redirectAfterHost(user, next, registration.eventId);
 }

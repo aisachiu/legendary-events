@@ -73,6 +73,8 @@ async function main() {
       isPaid: true,
       priceCents: 4500,
       allowOfflinePayment: true,
+      paymentInstructions:
+        "Transfer $45 to the host and put your name in the memo. Then upload a screenshot here.",
       organizerId: host.id,
     },
   });

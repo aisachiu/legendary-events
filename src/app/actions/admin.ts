@@ -7,12 +7,40 @@ import { isSuperadmin } from "@/lib/roles";
 
 const ROLES = new Set(["ATTENDEE", "ORGANIZER", "SUPERADMIN"]);
 const REG_STATUSES = new Set(["PENDING_PAYMENT", "CONFIRMED", "CANCELLED"]);
-const PAY_STATUSES = new Set(["UNPAID", "AWAITING_REVIEW", "PAID", "REJECTED"]);
+const PAY_STATUSES = new Set([
+  "UNPAID",
+  "AWAITING_REVIEW",
+  "PAID",
+  "REJECTED",
+  "REFUNDED",
+]);
 
 async function requireSuperadmin() {
   const user = await getCurrentUser();
   if (!user || !isSuperadmin(user)) redirect("/login?next=/admin");
   return user;
+}
+
+export async function createUserAdminAction(formData: FormData) {
+  await requireSuperadmin();
+  const name = String(formData.get("name") || "").trim();
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const password = String(formData.get("password") || "");
+  const role = String(formData.get("role") || "ATTENDEE");
+  if (!name || !email || password.length < 8 || !ROLES.has(role)) {
+    redirect("/admin?error=user-create");
+  }
+  const taken = await prisma.user.findUnique({ where: { email } });
+  if (taken) redirect("/admin?error=user-exists");
+  await prisma.user.create({
+    data: {
+      name,
+      email,
+      passwordHash: await hashPassword(password),
+      role,
+    },
+  });
+  redirect("/admin");
 }
 
 export async function updateUserAdminAction(formData: FormData) {
@@ -47,6 +75,30 @@ export async function updateUserAdminAction(formData: FormData) {
   redirect("/admin");
 }
 
+export async function deleteUserAdminAction(formData: FormData) {
+  const actor = await requireSuperadmin();
+  const id = String(formData.get("id") || "");
+  if (!id || id === actor.id) redirect("/admin?error=user-delete");
+
+  const target = await prisma.user.findUnique({
+    where: { id },
+    include: { _count: { select: { events: true } } },
+  });
+  if (!target) redirect("/admin");
+  if (target.role === "SUPERADMIN") {
+    const remaining = await prisma.user.count({
+      where: { role: "SUPERADMIN", id: { not: id } },
+    });
+    if (remaining === 0) redirect("/admin?error=last-admin");
+  }
+  if (target._count.events > 0) {
+    redirect("/admin?error=user-hosts");
+  }
+
+  await prisma.user.delete({ where: { id } });
+  redirect("/admin");
+}
+
 export async function updateRegistrationAdminAction(formData: FormData) {
   await requireSuperadmin();
   const id = String(formData.get("id") || "");
@@ -57,10 +109,10 @@ export async function updateRegistrationAdminAction(formData: FormData) {
     where: { id },
     data: {
       status,
-      bioHeadline: String(formData.get("bioHeadline") || "").trim() || null,
-      bioAbout: String(formData.get("bioAbout") || "").trim() || null,
-      bioCompany: String(formData.get("bioCompany") || "").trim() || null,
-      bioLinkedin: String(formData.get("bioLinkedin") || "").trim() || null,
+      preferredName: String(formData.get("preferredName") || "").trim() || null,
+      titlePosition: String(formData.get("titlePosition") || "").trim() || null,
+      introBio: String(formData.get("introBio") || "").trim() || null,
+      linkedinUrl: String(formData.get("linkedinUrl") || "").trim() || null,
     },
   });
   redirect("/admin");
@@ -75,7 +127,13 @@ export async function updatePaymentAdminAction(formData: FormData) {
 
   await prisma.payment.update({
     where: { id },
-    data: { status, evidenceNote },
+    data: {
+      status,
+      evidenceNote,
+      ...(status === "REFUNDED"
+        ? { refundedAt: new Date(), refundAmountCents: undefined }
+        : {}),
+    },
   });
 
   if (status === "PAID") {

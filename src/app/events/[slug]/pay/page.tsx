@@ -44,13 +44,14 @@ export default async function PayPage({
     );
   }
 
+  const rejected = registration.payment?.status === "REJECTED";
+
   return (
     <div className="mx-auto max-w-2xl px-5 py-12">
       <h1 className="font-serif text-4xl">Payment for {event.title}</h1>
       <p className="mt-2 text-[var(--mute)]">
-        {formatMoney(event.priceCents, event.currency)}. Pay the host off-platform (transfer,
-        cash, invoice), then upload a receipt. Your place is confirmed when they mark you
-        paid.
+        {formatMoney(event.priceCents, event.currency)}. Follow the host&apos;s instructions,
+        then upload a receipt. Your place is confirmed when they mark you paid.
       </p>
       <div className="mt-4">
         <StatusPills
@@ -58,7 +59,31 @@ export default async function PayPage({
           paymentStatus={registration.payment?.status}
         />
       </div>
+      {rejected ? (
+        <p className="mt-4 text-sm text-amber-900">
+          The last receipt was rejected. Upload a new one.
+        </p>
+      ) : null}
       {error ? <p className="mt-4 text-sm text-red-800">{error}</p> : null}
+
+      {(event.paymentInstructions || event.paymentImagePath) ? (
+        <div className="card mt-8 p-6">
+          <h2 className="font-serif text-2xl">How to pay</h2>
+          {event.paymentInstructions ? (
+            <p className="mt-3 whitespace-pre-wrap text-[var(--mute)]">
+              {event.paymentInstructions}
+            </p>
+          ) : null}
+          {event.paymentImagePath ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`/api/events/${slug}/pay-image`}
+              alt="Payment details"
+              className="mt-4 max-h-72 w-auto rounded-lg border border-[var(--line)]"
+            />
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="card mt-8 p-6">
         <h2 className="font-serif text-2xl">Upload receipt</h2>

@@ -20,17 +20,13 @@ export default async function NewEventPage({
         <p className="mt-3 text-sm text-red-800">
           {error === "price"
             ? "Paid events need a price of at least $1."
-            : "Fill every field."}
+            : "Fill title, description, venue, and start time."}
         </p>
       ) : null}
       <form action={createEventAction} className="mt-8 grid gap-4">
         <div>
           <label className="label">Title</label>
           <input className="field" name="title" required />
-        </div>
-        <div>
-          <label className="label">One-line summary</label>
-          <input className="field" name="summary" required />
         </div>
         <div>
           <label className="label">Description</label>
@@ -46,13 +42,13 @@ export default async function NewEventPage({
             <input className="field" type="datetime-local" name="startsAt" required />
           </div>
           <div>
-            <label className="label">Ends</label>
-            <input className="field" type="datetime-local" name="endsAt" required />
+            <label className="label">Ends (optional)</label>
+            <input className="field" type="datetime-local" name="endsAt" />
           </div>
         </div>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="isNetworking" defaultChecked />
-          Networking: confirmed guests can share and read bios
+          Who&apos;s Going: confirmed guests can see each other
         </label>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="isPaid" />
@@ -61,6 +57,18 @@ export default async function NewEventPage({
         <div>
           <label className="label">Price (USD)</label>
           <input className="field" type="number" name="price" min="0" step="0.01" defaultValue="45" />
+        </div>
+        <div>
+          <label className="label">Payment instructions</label>
+          <textarea
+            className="field min-h-24"
+            name="paymentInstructions"
+            placeholder="Bank details, Venmo handle, what to write in the transfer memo…"
+          />
+        </div>
+        <div>
+          <label className="label">Payment image (QR code, optional)</label>
+          <input className="field" type="file" name="paymentImage" accept="image/*" />
         </div>
         <button className="btn-gold w-fit" type="submit">
           Publish event

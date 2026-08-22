@@ -44,4 +44,5 @@ export const paymentLabel: Record<string, string> = {
   AWAITING_REVIEW: "Evidence submitted",
   PAID: "Paid",
   REJECTED: "Rejected",
+  REFUNDED: "Refunded",
 };

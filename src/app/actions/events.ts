@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { slugify } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { canHost, canManageEvent, isSuperadmin } from "@/lib/roles";
+import { eventBlurb, storeImageFromForm } from "@/lib/storage";
 
 async function requireHost() {
   const user = await getCurrentUser();
@@ -18,7 +19,6 @@ async function requireHost() {
 export async function createEventAction(formData: FormData) {
   const user = await requireHost();
   const title = String(formData.get("title") || "").trim();
-  const summary = String(formData.get("summary") || "").trim();
   const description = String(formData.get("description") || "").trim();
   const venue = String(formData.get("venue") || "").trim();
   const startsAt = String(formData.get("startsAt") || "");
@@ -26,29 +26,38 @@ export async function createEventAction(formData: FormData) {
   const isNetworking = formData.get("isNetworking") === "on";
   const isPaid = formData.get("isPaid") === "on";
   const price = Number(formData.get("price") || 0);
+  const paymentInstructions =
+    String(formData.get("paymentInstructions") || "").trim() || null;
 
-  if (!title || !summary || !description || !venue || !startsAt || !endsAt) {
+  if (!title || !description || !venue || !startsAt) {
     redirect("/dashboard/events/new?error=missing");
   }
 
+  const start = new Date(startsAt);
+  const end = endsAt ? new Date(endsAt) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
   const priceCents = isPaid ? Math.round(price * 100) : 0;
   if (isPaid && priceCents < 100) {
     redirect("/dashboard/events/new?error=price");
   }
 
+  const paymentImage = formData.get("paymentImage") as File | null;
+  const paymentImagePath = await storeImageFromForm(paymentImage, "pay-images");
+
   const event = await prisma.event.create({
     data: {
       slug: slugify(title),
       title,
-      summary,
+      summary: eventBlurb(description),
       description,
       venue,
-      startsAt: new Date(startsAt),
-      endsAt: new Date(endsAt),
+      startsAt: start,
+      endsAt: end,
       isNetworking,
       isPaid,
       priceCents,
       allowOfflinePayment: isPaid,
+      paymentInstructions,
+      paymentImagePath,
       organizerId: user.id,
     },
   });
@@ -63,12 +72,16 @@ export async function updateEventAction(formData: FormData) {
   if (!event || !canManageEvent(user, event.organizerId)) redirect("/dashboard");
 
   const isPaid = formData.get("isPaid") === "on";
+  const description = String(formData.get("description") || event.description).trim();
+  const paymentImage = formData.get("paymentImage") as File | null;
+  const uploaded = await storeImageFromForm(paymentImage, "pay-images");
+
   await prisma.event.update({
     where: { id },
     data: {
       title: String(formData.get("title") || event.title).trim(),
-      summary: String(formData.get("summary") || event.summary).trim(),
-      description: String(formData.get("description") || event.description).trim(),
+      summary: eventBlurb(description),
+      description,
       venue: String(formData.get("venue") || event.venue).trim(),
       startsAt: new Date(String(formData.get("startsAt") || event.startsAt)),
       endsAt: new Date(String(formData.get("endsAt") || event.endsAt)),
@@ -77,6 +90,9 @@ export async function updateEventAction(formData: FormData) {
       priceCents: isPaid ? Math.round(Number(formData.get("price") || 0) * 100) : 0,
       allowOfflinePayment: isPaid,
       published: formData.get("published") === "on",
+      paymentInstructions:
+        String(formData.get("paymentInstructions") || "").trim() || null,
+      ...(uploaded ? { paymentImagePath: uploaded } : {}),
     },
   });
 

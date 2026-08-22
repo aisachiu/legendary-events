@@ -1,11 +1,17 @@
 import { redirect } from "next/navigation";
 import { deleteEventAction, updateEventAction } from "@/app/actions/events";
 import {
+  createUserAdminAction,
+  deleteUserAdminAction,
   updatePaymentAdminAction,
   updateRegistrationAdminAction,
   updateUserAdminAction,
 } from "@/app/actions/admin";
-import { markPaidAction } from "@/app/actions/payments";
+import {
+  cancelAttendanceAction,
+  markPaidAction,
+  markRefundedAction,
+} from "@/app/actions/payments";
 import { getCurrentUser } from "@/lib/auth";
 import { formatMoney, formatWhen, toDatetimeLocal } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -48,41 +54,90 @@ export default async function AdminPage({
         Users, events, registrations, and payments. Change anything here.
       </p>
       {error === "last-admin" ? (
-        <p className="mt-4 text-sm text-red-800">You cannot demote the last superadmin.</p>
+        <p className="mt-4 text-sm text-red-800">You cannot remove the last superadmin.</p>
       ) : null}
+      {error === "user-hosts" ? (
+        <p className="mt-4 text-sm text-red-800">
+          Delete or reassign that person&apos;s events before deleting the user.
+        </p>
+      ) : null}
+      {error === "user-exists" || error === "user-create" ? (
+        <p className="mt-4 text-sm text-red-800">Could not create that user. Check email and password.</p>
+      ) : null}
+
+      <section className="mt-12">
+        <h2 className="font-serif text-3xl">Add user</h2>
+        <form action={createUserAdminAction} className="card mt-4 grid gap-3 p-4 sm:grid-cols-5">
+          <div>
+            <label className="label">Name</label>
+            <input className="field" name="name" required />
+          </div>
+          <div>
+            <label className="label">Email</label>
+            <input className="field" name="email" type="email" required />
+          </div>
+          <div>
+            <label className="label">Password</label>
+            <input className="field" name="password" type="password" minLength={8} required />
+          </div>
+          <div>
+            <label className="label">Role</label>
+            <select className="field" name="role" defaultValue="ATTENDEE">
+              <option value="ATTENDEE">ATTENDEE</option>
+              <option value="ORGANIZER">ORGANIZER</option>
+              <option value="SUPERADMIN">SUPERADMIN</option>
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button className="btn-gold" type="submit">
+              Create
+            </button>
+          </div>
+        </form>
+      </section>
 
       <section className="mt-12">
         <h2 className="font-serif text-3xl">Users ({users.length})</h2>
         <div className="mt-4 grid gap-4">
           {users.map((row) => (
-            <form key={row.id} action={updateUserAdminAction} className="card grid gap-3 p-4 sm:grid-cols-5">
-              <input type="hidden" name="id" value={row.id} />
-              <div>
-                <label className="label">Name</label>
-                <input className="field" name="name" defaultValue={row.name} />
-              </div>
-              <div>
-                <label className="label">Email</label>
-                <input className="field" name="email" defaultValue={row.email} />
-              </div>
-              <div>
-                <label className="label">Role</label>
-                <select className="field" name="role" defaultValue={row.role}>
-                  <option value="ATTENDEE">ATTENDEE</option>
-                  <option value="ORGANIZER">ORGANIZER</option>
-                  <option value="SUPERADMIN">SUPERADMIN</option>
-                </select>
-              </div>
-              <div>
-                <label className="label">New password</label>
-                <input className="field" name="password" type="password" minLength={8} placeholder="Leave blank" />
-              </div>
-              <div className="flex items-end">
-                <button className="btn-gold" type="submit">
-                  Save
-                </button>
-              </div>
-            </form>
+            <div key={row.id} className="card p-4">
+              <form action={updateUserAdminAction} className="grid gap-3 sm:grid-cols-5">
+                <input type="hidden" name="id" value={row.id} />
+                <div>
+                  <label className="label">Name</label>
+                  <input className="field" name="name" defaultValue={row.name} />
+                </div>
+                <div>
+                  <label className="label">Email</label>
+                  <input className="field" name="email" defaultValue={row.email} />
+                </div>
+                <div>
+                  <label className="label">Role</label>
+                  <select className="field" name="role" defaultValue={row.role}>
+                    <option value="ATTENDEE">ATTENDEE</option>
+                    <option value="ORGANIZER">ORGANIZER</option>
+                    <option value="SUPERADMIN">SUPERADMIN</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="label">New password</label>
+                  <input className="field" name="password" type="password" minLength={8} placeholder="Leave blank" />
+                </div>
+                <div className="flex items-end">
+                  <button className="btn-gold" type="submit">
+                    Save
+                  </button>
+                </div>
+              </form>
+              {row.id !== user.id ? (
+                <form action={deleteUserAdminAction} className="mt-3">
+                  <input type="hidden" name="id" value={row.id} />
+                  <button className="text-sm text-red-800 underline" type="submit">
+                    Delete user
+                  </button>
+                </form>
+              ) : null}
+            </div>
           ))}
         </div>
       </section>
@@ -101,10 +156,6 @@ export default async function AdminPage({
                 <div className="sm:col-span-2">
                   <label className="label">Title</label>
                   <input className="field" name="title" defaultValue={event.title} />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="label">Summary</label>
-                  <input className="field" name="summary" defaultValue={event.summary} />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="label">Description</label>
@@ -144,7 +195,7 @@ export default async function AdminPage({
                 </div>
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" name="isNetworking" defaultChecked={event.isNetworking} />
-                  Networking
+                  Who&apos;s Going
                 </label>
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" name="isPaid" defaultChecked={event.isPaid} />
@@ -154,6 +205,14 @@ export default async function AdminPage({
                   <input type="checkbox" name="published" defaultChecked={event.published} />
                   Published
                 </label>
+                <div className="sm:col-span-2">
+                  <label className="label">Payment instructions</label>
+                  <textarea
+                    className="field min-h-20"
+                    name="paymentInstructions"
+                    defaultValue={event.paymentInstructions ?? ""}
+                  />
+                </div>
                 <button className="btn-gold w-fit" type="submit">
                   Save event
                 </button>
@@ -173,41 +232,52 @@ export default async function AdminPage({
         <h2 className="font-serif text-3xl">Registrations ({registrations.length})</h2>
         <div className="mt-4 grid gap-4">
           {registrations.map((row) => (
-            <form key={row.id} action={updateRegistrationAdminAction} className="card grid gap-3 p-4">
-              <input type="hidden" name="id" value={row.id} />
-              <p className="text-sm text-[var(--mute)]">
-                {row.user.name} ({row.user.email}) · {row.event.title}
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="label">Status</label>
-                  <select className="field" name="status" defaultValue={row.status}>
-                    <option value="PENDING_PAYMENT">PENDING_PAYMENT</option>
-                    <option value="CONFIRMED">CONFIRMED</option>
-                    <option value="CANCELLED">CANCELLED</option>
-                  </select>
+            <div key={row.id} className="card p-4">
+              <form action={updateRegistrationAdminAction} className="grid gap-3">
+                <input type="hidden" name="id" value={row.id} />
+                <p className="text-sm text-[var(--mute)]">
+                  {row.user.name} ({row.user.email}) · {row.event.title}
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="label">Status</label>
+                    <select className="field" name="status" defaultValue={row.status}>
+                      <option value="PENDING_PAYMENT">PENDING_PAYMENT</option>
+                      <option value="CONFIRMED">CONFIRMED</option>
+                      <option value="CANCELLED">CANCELLED</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Preferred name</label>
+                    <input className="field" name="preferredName" defaultValue={row.preferredName ?? ""} />
+                  </div>
+                  <div>
+                    <label className="label">Title / position</label>
+                    <input className="field" name="titlePosition" defaultValue={row.titlePosition ?? ""} />
+                  </div>
+                  <div>
+                    <label className="label">LinkedIn URL</label>
+                    <input className="field" name="linkedinUrl" defaultValue={row.linkedinUrl ?? ""} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="label">Intro / bio</label>
+                    <textarea className="field min-h-20" name="introBio" defaultValue={row.introBio ?? ""} />
+                  </div>
                 </div>
-                <div>
-                  <label className="label">Headline</label>
-                  <input className="field" name="bioHeadline" defaultValue={row.bioHeadline ?? ""} />
-                </div>
-                <div>
-                  <label className="label">Company</label>
-                  <input className="field" name="bioCompany" defaultValue={row.bioCompany ?? ""} />
-                </div>
-                <div>
-                  <label className="label">LinkedIn</label>
-                  <input className="field" name="bioLinkedin" defaultValue={row.bioLinkedin ?? ""} />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="label">About</label>
-                  <textarea className="field min-h-20" name="bioAbout" defaultValue={row.bioAbout ?? ""} />
-                </div>
-              </div>
-              <button className="btn-gold w-fit" type="submit">
-                Save registration
-              </button>
-            </form>
+                <button className="btn-gold w-fit" type="submit">
+                  Save registration
+                </button>
+              </form>
+              {row.status !== "CANCELLED" ? (
+                <form action={cancelAttendanceAction} className="mt-2">
+                  <input type="hidden" name="registrationId" value={row.id} />
+                  <input type="hidden" name="next" value="/admin" />
+                  <button className="text-sm underline" type="submit">
+                    Cancel attendance
+                  </button>
+                </form>
+              ) : null}
+            </div>
           ))}
         </div>
       </section>
@@ -240,13 +310,22 @@ export default async function AdminPage({
                   <td className="py-3 pr-3">{formatMoney(row.amountCents, row.currency)}</td>
                   <td className="py-3 pr-3">
                     {row.evidencePath ? (
-                      <a className="underline" href={row.evidencePath} target="_blank" rel="noreferrer">
-                        View file
-                      </a>
+                      <div>
+                        <a
+                          className="underline"
+                          href={`/api/receipts/${row.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          View receipt
+                        </a>
+                        {row.evidenceNote ? (
+                          <p className="mt-1 text-[var(--mute)]">{row.evidenceNote}</p>
+                        ) : null}
+                      </div>
                     ) : (
                       "—"
                     )}
-                    {row.evidenceNote ? <p className="mt-1 text-[var(--mute)]">{row.evidenceNote}</p> : null}
                   </td>
                   <td className="py-3">
                     <form action={updatePaymentAdminAction} className="mb-2 flex flex-wrap gap-2">
@@ -256,6 +335,7 @@ export default async function AdminPage({
                         <option value="AWAITING_REVIEW">AWAITING_REVIEW</option>
                         <option value="PAID">PAID</option>
                         <option value="REJECTED">REJECTED</option>
+                        <option value="REFUNDED">REFUNDED</option>
                       </select>
                       <input
                         className="field w-40"
@@ -267,26 +347,45 @@ export default async function AdminPage({
                         Save
                       </button>
                     </form>
-                    {row.registration.status !== "CONFIRMED" ? (
-                      <div className="flex gap-2">
-                        <form action={markPaidAction}>
+                    <div className="flex flex-wrap gap-2">
+                      {row.status !== "PAID" && row.status !== "REFUNDED" ? (
+                        <>
+                          <form action={markPaidAction}>
+                            <input type="hidden" name="paymentId" value={row.id} />
+                            <input type="hidden" name="decision" value="paid" />
+                            <input type="hidden" name="next" value="/admin" />
+                            <button className="btn-gold" type="submit">
+                              Mark as paid
+                            </button>
+                          </form>
+                          <form action={markPaidAction}>
+                            <input type="hidden" name="paymentId" value={row.id} />
+                            <input type="hidden" name="decision" value="reject" />
+                            <input type="hidden" name="next" value="/admin" />
+                            <button className="btn-line" type="submit">
+                              Reject
+                            </button>
+                          </form>
+                        </>
+                      ) : null}
+                      {row.status === "PAID" ? (
+                        <form action={markRefundedAction} className="flex flex-wrap gap-2">
                           <input type="hidden" name="paymentId" value={row.id} />
-                          <input type="hidden" name="decision" value="paid" />
                           <input type="hidden" name="next" value="/admin" />
-                          <button className="btn-gold" type="submit">
-                            Mark as paid
-                          </button>
-                        </form>
-                        <form action={markPaidAction}>
-                          <input type="hidden" name="paymentId" value={row.id} />
-                          <input type="hidden" name="decision" value="reject" />
-                          <input type="hidden" name="next" value="/admin" />
+                          <input
+                            className="field w-24"
+                            name="refundAmount"
+                            type="number"
+                            step="0.01"
+                            defaultValue={(row.amountCents / 100).toFixed(2)}
+                          />
+                          <input className="field w-32" name="refundNote" placeholder="Refund note" />
                           <button className="btn-line" type="submit">
-                            Reject
+                            Refund
                           </button>
                         </form>
-                      </div>
-                    ) : null}
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}

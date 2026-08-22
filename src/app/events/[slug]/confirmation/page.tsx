@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cancelAttendanceAction } from "@/app/actions/payments";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { StatusPills } from "@/components/Pills";
@@ -38,7 +39,13 @@ export default async function ConfirmationPage({
   return (
     <div className="mx-auto max-w-xl px-5 py-16">
       <h1 className="font-serif text-4xl">
-        {confirmed ? "You are confirmed" : waiting ? "Evidence is with the host" : "Almost in"}
+        {registration.status === "CANCELLED"
+          ? "Signup cancelled"
+          : confirmed
+            ? "You are confirmed"
+            : waiting
+              ? "Evidence is with the host"
+              : "Almost in"}
       </h1>
       <p className="mt-3 text-[var(--mute)]">{event.title}</p>
       <div className="mt-4">
@@ -49,8 +56,8 @@ export default async function ConfirmationPage({
       </div>
       {waiting ? (
         <p className="mt-6 text-sm leading-6 text-[var(--mute)]">
-          The host will open this once they match your upload. You will not see other
-          bios until then.
+          The host will open this once they match your upload. You will not see Who&apos;s
+          Going until then.
         </p>
       ) : null}
       <div className="mt-8 flex flex-wrap gap-3">
@@ -58,16 +65,24 @@ export default async function ConfirmationPage({
           Event page
         </Link>
         {confirmed && event.isNetworking ? (
-          <Link href={`/events/${slug}/room`} className="btn-gold">
-            See who is coming
+          <Link href={`/events/${slug}/going`} className="btn-gold">
+            Who&apos;s Going
           </Link>
         ) : null}
-        {!confirmed && event.isPaid ? (
+        {!confirmed && event.isPaid && registration.status !== "CANCELLED" ? (
           <Link href={`/events/${slug}/pay`} className="btn-gold">
             Upload receipt
           </Link>
         ) : null}
       </div>
+      {registration.status !== "CANCELLED" ? (
+        <form action={cancelAttendanceAction} className="mt-8">
+          <input type="hidden" name="registrationId" value={registration.id} />
+          <button className="text-sm text-[var(--mute)] underline" type="submit">
+            Cancel my attendance
+          </button>
+        </form>
+      ) : null}
     </div>
   );
 }

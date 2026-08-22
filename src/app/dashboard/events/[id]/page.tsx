@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { updateEventAction } from "@/app/actions/events";
-import { markPaidAction } from "@/app/actions/payments";
+import {
+  cancelAttendanceAction,
+  markPaidAction,
+  markRefundedAction,
+} from "@/app/actions/payments";
 import { getCurrentUser } from "@/lib/auth";
 import { formatMoney, formatWhen, toDatetimeLocal } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -34,6 +38,8 @@ export default async function EventDeskPage({
     );
   }
 
+  const ledger = event.registrations.filter((r) => r.status !== "CANCELLED");
+
   return (
     <div className="mx-auto max-w-5xl px-5 py-12">
       <Link href="/dashboard" className="text-sm text-[var(--mute)]">
@@ -46,7 +52,7 @@ export default async function EventDeskPage({
         </Link>
       </div>
       <p className="mt-2 text-sm text-[var(--mute)]">
-        {formatWhen(event.startsAt)} · {event.registrations.length} signups
+        {formatWhen(event.startsAt)} · {ledger.length} on the ledger
       </p>
 
       <form action={updateEventAction} className="card mt-8 grid gap-4 p-6 sm:grid-cols-2">
@@ -54,10 +60,6 @@ export default async function EventDeskPage({
         <div className="sm:col-span-2">
           <label className="label">Title</label>
           <input className="field" name="title" defaultValue={event.title} />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="label">Summary</label>
-          <input className="field" name="summary" defaultValue={event.summary} />
         </div>
         <div className="sm:col-span-2">
           <label className="label">Description</label>
@@ -97,7 +99,7 @@ export default async function EventDeskPage({
         </div>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="isNetworking" defaultChecked={event.isNetworking} />
-          Networking room
+          Who&apos;s Going
         </label>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="isPaid" defaultChecked={event.isPaid} />
@@ -107,6 +109,26 @@ export default async function EventDeskPage({
           <input type="checkbox" name="published" defaultChecked={event.published} />
           Published
         </label>
+        <div className="sm:col-span-2">
+          <label className="label">Payment instructions</label>
+          <textarea
+            className="field min-h-24"
+            name="paymentInstructions"
+            defaultValue={event.paymentInstructions ?? ""}
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="label">Payment image (QR, optional)</label>
+          <input className="field" type="file" name="paymentImage" accept="image/*" />
+          {event.paymentImagePath ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`/api/events/${event.slug}/pay-image`}
+              alt=""
+              className="mt-3 max-h-40 rounded-lg border border-[var(--line)]"
+            />
+          ) : null}
+        </div>
         <button className="btn-gold w-fit" type="submit">
           Save event
         </button>
@@ -114,25 +136,24 @@ export default async function EventDeskPage({
 
       <h2 className="mt-12 font-serif text-3xl">Payment ledger</h2>
       <p className="mt-1 text-sm text-[var(--mute)]">
-        Guests pay off-platform and upload proof. Mark a row paid when the receipt matches.
+        Cancelled guests are hidden here. Mark paid, reject a receipt, refund, or remove a row.
       </p>
       <div className="mt-6 overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <table className="w-full min-w-[800px] text-left text-sm">
           <thead>
             <tr className="border-b border-[var(--line)] text-[var(--mute)]">
               <th className="py-2 pr-3 font-normal">Guest</th>
               <th className="py-2 pr-3 font-normal">Status</th>
-              <th className="py-2 pr-3 font-normal">Method</th>
               <th className="py-2 pr-3 font-normal">Amount</th>
               <th className="py-2 pr-3 font-normal">Evidence</th>
               <th className="py-2 font-normal">Host action</th>
             </tr>
           </thead>
           <tbody>
-            {event.registrations.map((row) => (
+            {ledger.map((row) => (
               <tr key={row.id} className="border-b border-[var(--line)] align-top">
                 <td className="py-3 pr-3">
-                  <div>{row.user.name}</div>
+                  <div>{row.preferredName || row.user.name}</div>
                   <div className="text-[var(--mute)]">{row.user.email}</div>
                 </td>
                 <td className="py-3 pr-3">
@@ -140,8 +161,15 @@ export default async function EventDeskPage({
                     registrationStatus={row.status}
                     paymentStatus={row.payment?.status}
                   />
+                  {row.payment?.refundNote ? (
+                    <p className="mt-1 text-xs text-[var(--mute)]">
+                      Refund: {row.payment.refundNote}
+                      {row.payment.refundAmountCents != null
+                        ? ` (${formatMoney(row.payment.refundAmountCents, row.payment.currency)})`
+                        : ""}
+                    </p>
+                  ) : null}
                 </td>
-                <td className="py-3 pr-3">{row.payment?.method ?? "—"}</td>
                 <td className="py-3 pr-3">
                   {row.payment
                     ? formatMoney(row.payment.amountCents, row.payment.currency)
@@ -152,11 +180,11 @@ export default async function EventDeskPage({
                     <div>
                       <a
                         className="underline"
-                        href={row.payment.evidencePath}
+                        href={`/api/receipts/${row.payment.id}`}
                         target="_blank"
                         rel="noreferrer"
                       >
-                        View file
+                        View receipt
                       </a>
                       {row.payment.evidenceNote ? (
                         <p className="mt-1 text-[var(--mute)]">{row.payment.evidenceNote}</p>
@@ -167,35 +195,59 @@ export default async function EventDeskPage({
                   )}
                 </td>
                 <td className="py-3">
-                  {row.payment && row.status !== "CONFIRMED" ? (
-                    <div className="flex flex-wrap gap-2">
-                      <form action={markPaidAction}>
-                        <input type="hidden" name="paymentId" value={row.payment.id} />
-                        <input type="hidden" name="decision" value="paid" />
-                        <button className="btn-gold" type="submit">
-                          Mark as paid
-                        </button>
-                      </form>
-                      {row.payment.status === "AWAITING_REVIEW" ? (
+                  <div className="flex flex-col gap-2">
+                    {row.payment && row.payment.status !== "PAID" && row.payment.status !== "REFUNDED" ? (
+                      <div className="flex flex-wrap gap-2">
                         <form action={markPaidAction}>
                           <input type="hidden" name="paymentId" value={row.payment.id} />
-                          <input type="hidden" name="decision" value="reject" />
-                          <button className="btn-line" type="submit">
-                            Reject
+                          <input type="hidden" name="decision" value="paid" />
+                          <button className="btn-gold" type="submit">
+                            Mark as paid
                           </button>
                         </form>
-                      ) : null}
-                    </div>
-                  ) : (
-                    "—"
-                  )}
+                        {row.payment.status === "AWAITING_REVIEW" ||
+                        row.payment.status === "REJECTED" ? (
+                          <form action={markPaidAction}>
+                            <input type="hidden" name="paymentId" value={row.payment.id} />
+                            <input type="hidden" name="decision" value="reject" />
+                            <button className="btn-line" type="submit">
+                              Reject
+                            </button>
+                          </form>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {row.payment && row.payment.status === "PAID" ? (
+                      <form action={markRefundedAction} className="flex flex-wrap gap-2">
+                        <input type="hidden" name="paymentId" value={row.payment.id} />
+                        <input
+                          className="field w-28"
+                          name="refundAmount"
+                          type="number"
+                          step="0.01"
+                          placeholder="Amount"
+                          defaultValue={(row.payment.amountCents / 100).toFixed(2)}
+                        />
+                        <input className="field w-40" name="refundNote" placeholder="Refund note" />
+                        <button className="btn-line" type="submit">
+                          Mark refunded
+                        </button>
+                      </form>
+                    ) : null}
+                    <form action={cancelAttendanceAction}>
+                      <input type="hidden" name="registrationId" value={row.id} />
+                      <button className="text-sm text-red-800 underline" type="submit">
+                        Remove from ledger
+                      </button>
+                    </form>
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {event.registrations.length === 0 ? (
-          <p className="mt-4 text-[var(--mute)]">No signups yet.</p>
+        {ledger.length === 0 ? (
+          <p className="mt-4 text-[var(--mute)]">No active signups.</p>
         ) : null}
       </div>
     </div>

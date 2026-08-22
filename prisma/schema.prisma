@@ -21,56 +21,61 @@ model User {
 }
 
 model Event {
-  id                  String         @id @default(cuid())
-  slug                String         @unique
-  title               String
-  summary             String
-  description         String
-  venue               String
-  startsAt            DateTime
-  endsAt              DateTime
-  isNetworking        Boolean        @default(false)
-  isPaid              Boolean        @default(false)
-  priceCents          Int            @default(0)
-  currency            String         @default("usd")
-  allowOfflinePayment Boolean        @default(true)
-  published           Boolean        @default(true)
-  organizerId         String
-  organizer           User           @relation(fields: [organizerId], references: [id])
-  createdAt           DateTime       @default(now())
-  registrations       Registration[]
+  id                    String         @id @default(cuid())
+  slug                  String         @unique
+  title                 String
+  summary               String         @default("")
+  description           String
+  venue                 String
+  startsAt              DateTime
+  endsAt                DateTime
+  isNetworking          Boolean        @default(false)
+  isPaid                Boolean        @default(false)
+  priceCents            Int            @default(0)
+  currency              String         @default("usd")
+  allowOfflinePayment   Boolean        @default(true)
+  published             Boolean        @default(true)
+  paymentInstructions   String?
+  paymentImagePath      String?
+  organizerId           String
+  organizer             User           @relation(fields: [organizerId], references: [id])
+  createdAt             DateTime       @default(now())
+  registrations         Registration[]
 }
 
 model Registration {
-  id          String   @id @default(cuid())
-  eventId     String
-  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  status      String   @default("PENDING_PAYMENT")
-  bioHeadline String?
-  bioAbout    String?
-  bioCompany  String?
-  bioLinkedin String?
-  createdAt   DateTime @default(now())
-  payment     Payment?
+  id            String   @id @default(cuid())
+  eventId       String
+  event         Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status        String   @default("PENDING_PAYMENT")
+  preferredName String?
+  titlePosition String?
+  introBio      String?
+  linkedinUrl   String?
+  createdAt     DateTime @default(now())
+  payment       Payment?
 
   @@unique([eventId, userId])
 }
 
 model Payment {
-  id               String       @id @default(cuid())
-  registrationId   String       @unique
-  registration     Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  method           String
-  status           String
-  amountCents      Int
-  currency         String       @default("usd")
-  evidencePath     String?
-  evidenceNote     String?
-  markedPaidAt     DateTime?
-  markedPaidById   String?
-  markedPaidBy     User?        @relation("MarkedBy", fields: [markedPaidById], references: [id])
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  id                 String       @id @default(cuid())
+  registrationId     String       @unique
+  registration       Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  method             String
+  status             String
+  amountCents        Int
+  currency           String       @default("usd")
+  evidencePath       String?
+  evidenceNote       String?
+  markedPaidAt       DateTime?
+  markedPaidById     String?
+  markedPaidBy       User?        @relation("MarkedBy", fields: [markedPaidById], references: [id])
+  refundedAt         DateTime?
+  refundNote         String?
+  refundAmountCents  Int?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 }

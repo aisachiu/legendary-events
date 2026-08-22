@@ -3,6 +3,7 @@ import { signupAction } from "@/app/actions/payments";
 import { getCurrentUser } from "@/lib/auth";
 import { formatMoney, formatWhen } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { eventBlurb } from "@/lib/storage";
 import { Pill } from "@/components/Pills";
 
 export default async function EventPage({
@@ -34,11 +35,13 @@ export default async function EventPage({
       })
     : null;
 
+  const blurb = eventBlurb(event.description, event.summary);
+
   return (
     <div className="mx-auto grid max-w-5xl gap-10 px-5 py-12 lg:grid-cols-[1.2fr_0.8fr]">
       <article>
         <div className="flex flex-wrap gap-2">
-          {event.isNetworking ? <Pill>Networking room</Pill> : null}
+          {event.isNetworking ? <Pill>Who&apos;s Going</Pill> : null}
           {event.isPaid ? (
             <Pill>{formatMoney(event.priceCents, event.currency)}</Pill>
           ) : (
@@ -46,7 +49,7 @@ export default async function EventPage({
           )}
         </div>
         <h1 className="mt-4 font-serif text-5xl">{event.title}</h1>
-        <p className="mt-3 text-lg text-[var(--mute)]">{event.summary}</p>
+        {blurb ? <p className="mt-3 text-lg text-[var(--mute)]">{blurb}</p> : null}
         <p className="mt-6 text-sm text-[var(--mute)]">
           {formatWhen(event.startsAt)} — {formatWhen(event.endsAt)}
           <br />
@@ -55,7 +58,7 @@ export default async function EventPage({
         <p className="mt-8 whitespace-pre-wrap leading-7">{event.description}</p>
         {event.isNetworking ? (
           <p className="mt-8 text-sm text-[var(--mute)]">
-            Bios stay closed until your place is confirmed
+            Who&apos;s Going stays closed until your place is confirmed
             {event.isPaid ? " (after the host accepts your receipt)" : ""}.
           </p>
         ) : null}
@@ -72,8 +75,8 @@ export default async function EventPage({
                 View confirmation
               </Link>
               {event.isNetworking ? (
-                <Link href={`/events/${slug}/room`} className="btn-gold">
-                  Open the room
+                <Link href={`/events/${slug}/going`} className="btn-gold">
+                  Who&apos;s Going
                 </Link>
               ) : null}
             </div>
@@ -88,6 +91,8 @@ export default async function EventPage({
               Go to payment
             </Link>
           </div>
+        ) : mine?.status === "CANCELLED" ? (
+          <p className="text-sm text-[var(--mute)]">This signup was cancelled.</p>
         ) : (
           <form action={signupAction} className="space-y-3">
             <input type="hidden" name="slug" value={slug} />
@@ -119,20 +124,24 @@ export default async function EventPage({
             {event.isNetworking ? (
               <>
                 <div>
-                  <label className="label">Headline</label>
-                  <input className="field" name="bioHeadline" placeholder="Founder, Harbour Studio" />
+                  <label className="label">Preferred name (at the event)</label>
+                  <input className="field" name="preferredName" defaultValue={user?.name ?? ""} />
                 </div>
                 <div>
-                  <label className="label">Company / project</label>
-                  <input className="field" name="bioCompany" />
+                  <label className="label">Title / position</label>
+                  <input className="field" name="titlePosition" />
                 </div>
                 <div>
-                  <label className="label">About you</label>
-                  <textarea className="field min-h-24" name="bioAbout" />
+                  <label className="label">Intro / bio</label>
+                  <textarea
+                    className="field min-h-24"
+                    name="introBio"
+                    placeholder="Write a sentence or two to introduce yourself!"
+                  />
                 </div>
                 <div>
-                  <label className="label">LinkedIn or site</label>
-                  <input className="field" name="bioLinkedin" placeholder="https://" />
+                  <label className="label">LinkedIn URL</label>
+                  <input className="field" name="linkedinUrl" placeholder="https://" />
                 </div>
               </>
             ) : null}
