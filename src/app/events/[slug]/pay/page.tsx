@@ -31,7 +31,7 @@ export default async function PayPage({
 
   const registration = await prisma.registration.findUnique({
     where: { eventId_userId: { eventId: event.id, userId: user.id } },
-    include: { payment: true },
+    include: { spots: { include: { payment: true }, orderBy: { createdAt: "asc" } } },
   });
   if (!registration) {
     return (
@@ -55,19 +55,38 @@ export default async function PayPage({
     );
   }
 
-  const rejected = registration.payment?.status === "REJECTED";
+  const dueSpots = registration.spots.filter(
+    (s) => s.payment && s.payment.status !== "PAID" && s.payment.status !== "REFUNDED",
+  );
+  const dueCents = dueSpots.reduce((sum, s) => sum + (s.payment?.amountCents ?? 0), 0);
+  const rejected = dueSpots.some((s) => s.payment?.status === "REJECTED");
+  const paymentStatus = dueSpots[0]?.payment?.status;
 
   return (
     <div className="mx-auto max-w-2xl px-5 py-12">
       <h1 className="font-serif text-4xl">Payment for {event.title}</h1>
       <p className="mt-2 text-[var(--mute)]">
-        {formatMoney(event.priceCents, event.currency)}. Follow the host&apos;s instructions,
-        then upload a receipt. Your place is confirmed when they mark you paid.
+        {formatMoney(event.priceCents, event.currency)} per person. You are the account holder.
+        Total due: <strong>{formatMoney(dueCents, event.currency)}</strong> for {dueSpots.length}{" "}
+        {dueSpots.length === 1 ? "spot" : "spots"}. Follow the host&apos;s instructions, then
+        upload one receipt for the group.
       </p>
+      <ul className="mt-4 space-y-1 text-sm">
+        {registration.spots
+          .filter((s) => s.status !== "CANCELLED")
+          .map((spot) => (
+            <li key={spot.id}>
+              {spot.name}
+              {spot.payment
+                ? ` · ${formatMoney(spot.payment.amountCents, spot.payment.currency)} · ${spot.payment.status}`
+                : ""}
+            </li>
+          ))}
+      </ul>
       <div className="mt-4">
         <StatusPills
           registrationStatus={registration.status}
-          paymentStatus={registration.payment?.status}
+          paymentStatus={paymentStatus}
         />
       </div>
       {rejected ? (
@@ -77,7 +96,7 @@ export default async function PayPage({
       ) : null}
       {error ? <p className="mt-4 text-sm text-red-800">{error}</p> : null}
 
-      {(event.paymentInstructions || event.paymentImagePath) ? (
+      {event.paymentInstructions || event.paymentImagePath ? (
         <div className="card mt-8 p-6">
           <h2 className="font-serif text-2xl">How to pay</h2>
           {event.paymentInstructions ? (
@@ -96,27 +115,31 @@ export default async function PayPage({
         </div>
       ) : null}
 
-      <div className="card mt-8 p-6">
-        <h2 className="font-serif text-2xl">Upload receipt</h2>
-        <form action={submitOfflinePaymentAction} className="mt-4 space-y-3">
-          <input type="hidden" name="slug" value={slug} />
-          <div>
-            <label className="label">Evidence</label>
-            <input className="field" type="file" name="evidence" required accept="image/*,.pdf" />
-          </div>
-          <div>
-            <label className="label">Note for the host</label>
-            <textarea
-              className="field min-h-20"
-              name="evidenceNote"
-              placeholder="Transfer reference, last four, who paid…"
-            />
-          </div>
-          <button className="btn-gold" type="submit">
-            Submit evidence
-          </button>
-        </form>
-      </div>
+      {dueCents > 0 ? (
+        <div className="card mt-8 p-6">
+          <h2 className="font-serif text-2xl">Upload receipt</h2>
+          <form action={submitOfflinePaymentAction} className="mt-4 space-y-3">
+            <input type="hidden" name="slug" value={slug} />
+            <div>
+              <label className="label">Evidence</label>
+              <input className="field" type="file" name="evidence" required accept="image/*,.pdf" />
+            </div>
+            <div>
+              <label className="label">Note for the host</label>
+              <textarea
+                className="field min-h-20"
+                name="evidenceNote"
+                placeholder="Transfer reference, last four, who paid…"
+              />
+            </div>
+            <button className="btn-gold" type="submit">
+              Submit evidence
+            </button>
+          </form>
+        </div>
+      ) : (
+        <p className="mt-8 text-sm text-[var(--mute)]">Nothing left to pay on this booking.</p>
+      )}
     </div>
   );
 }

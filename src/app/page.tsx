@@ -10,9 +10,12 @@ export default async function HomePage() {
     where: { published: true },
     orderBy: { startsAt: "asc" },
     include: {
-      _count: {
+      registrations: {
         select: {
-          registrations: { where: { status: { in: [...OCCUPYING_STATUSES] } } },
+          spots: {
+            where: { status: { in: [...OCCUPYING_STATUSES] } },
+            select: { id: true },
+          },
         },
       },
     },
@@ -51,7 +54,10 @@ export default async function HomePage() {
             </div>
             <p className="mt-4 text-sm text-[var(--mute)]">
               {formatWhen(event.startsAt)} · {event.venue} ·{" "}
-              {formatSignupCount(event._count.registrations, event.capacity)}
+              {formatSignupCount(
+                event.registrations.reduce((n, r) => n + r.spots.length, 0),
+                event.capacity,
+              )}
             </p>
           </Link>
         ))}

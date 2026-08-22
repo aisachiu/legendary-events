@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { bookingStatusFromSpots } from "@/lib/registrations";
 import { isSuperadmin } from "@/lib/roles";
 
 const ROLES = new Set(["ATTENDEE", "ORGANIZER", "SUPERADMIN"]);
@@ -111,6 +112,10 @@ export async function updateRegistrationAdminAction(formData: FormData) {
       linkedinUrl: String(formData.get("linkedinUrl") || "").trim() || null,
     },
   });
+  await prisma.spot.updateMany({
+    where: { registrationId: id },
+    data: { status },
+  });
   redirect("/admin");
 }
 
@@ -133,11 +138,21 @@ export async function updatePaymentAdminAction(formData: FormData) {
   });
 
   if (status === "PAID") {
-    const payment = await prisma.payment.findUnique({ where: { id } });
+    const payment = await prisma.payment.findUnique({
+      where: { id },
+      include: { spot: true },
+    });
     if (payment) {
-      await prisma.registration.update({
-        where: { id: payment.registrationId },
+      await prisma.spot.update({
+        where: { id: payment.spotId },
         data: { status: "CONFIRMED" },
+      });
+      const spots = await prisma.spot.findMany({
+        where: { registrationId: payment.spot.registrationId },
+      });
+      await prisma.registration.update({
+        where: { id: payment.spot.registrationId },
+        data: { status: bookingStatusFromSpots(spots) },
       });
     }
   }

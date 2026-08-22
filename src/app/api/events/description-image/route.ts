@@ -2,7 +2,17 @@ import { NextResponse } from "next/server";
 import path from "path";
 import { getCurrentUser } from "@/lib/auth";
 import { canHost } from "@/lib/roles";
-import { storePublicFile } from "@/lib/storage";
+import { storePrivateFile } from "@/lib/storage";
+
+function extFromFile(file: File) {
+  const fromName = path.extname(file.name || "").toLowerCase();
+  if (fromName) return fromName;
+  if (file.type === "image/png") return ".png";
+  if (file.type === "image/jpeg") return ".jpg";
+  if (file.type === "image/webp") return ".webp";
+  if (file.type === "image/gif") return ".gif";
+  return ".png";
+}
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -19,20 +29,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Image must be under 8MB." }, { status: 400 });
   }
 
-  const ext = path.extname(file.name || "").toLowerCase() || ".png";
+  const ext = extFromFile(file);
   const allowed = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
   if (!allowed.includes(ext)) {
     return NextResponse.json({ error: "Use a PNG, JPG, WEBP, or GIF." }, { status: 400 });
   }
 
   try {
-    const url = await storePublicFile(
+    const stored = await storePrivateFile(
       `event-images/${Date.now()}${ext}`,
       Buffer.from(await file.arrayBuffer()),
       file.type || "image/png",
     );
+    const url = `/api/public-media?key=${encodeURIComponent(stored)}`;
     return NextResponse.json({ url });
-  } catch {
-    return NextResponse.json({ error: "Could not store that image." }, { status: 500 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Could not store that image.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

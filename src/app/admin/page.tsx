@@ -36,12 +36,12 @@ export default async function AdminPage({
     }),
     prisma.registration.findMany({
       orderBy: { createdAt: "desc" },
-      include: { user: true, event: true, payment: true },
+      include: { user: true, event: true, spots: { include: { payment: true } } },
     }),
     prisma.payment.findMany({
       orderBy: { createdAt: "desc" },
       include: {
-        registration: { include: { user: true, event: true } },
+        spot: { include: { registration: { include: { user: true, event: true } } } },
       },
     }),
   ]);
@@ -176,6 +176,16 @@ export default async function AdminPage({
                     maxLength={3}
                   />
                   <input type="hidden" name="currencyPreset" value="OTHER" />
+                </div>
+                <div>
+                  <label className="label">Max per person</label>
+                  <input
+                    className="field"
+                    type="number"
+                    name="maxPerOrder"
+                    min={1}
+                    defaultValue={event.maxPerOrder}
+                  />
                 </div>
                 <div>
                   <label className="label">Quota</label>
@@ -319,11 +329,11 @@ export default async function AdminPage({
               {payments.map((row) => (
                 <tr key={row.id} className="border-b border-[var(--line)] align-top">
                   <td className="py-3 pr-3">
-                    <div>{row.registration.user.name}</div>
-                    <div className="text-[var(--mute)]">{row.registration.event.title}</div>
+                    <div>{row.spot.registration.user.name}</div>
+                    <div className="text-[var(--mute)]">{row.spot.registration.event.title}</div>
                     <div className="mt-1">
                       <StatusPills
-                        registrationStatus={row.registration.status}
+                        registrationStatus={row.spot.registration.status}
                         paymentStatus={row.status}
                       />
                     </div>

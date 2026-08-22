@@ -37,6 +37,7 @@ export async function createEventAction(formData: FormData) {
     String(formData.get("paymentInstructions") || "").trim() || null;
   const currency = isPaid ? parseCurrencyFromForm(formData) : "hkd";
   const capacity = parseCapacityFromForm(formData);
+  const maxPerOrder = Math.max(1, Math.floor(Number(formData.get("maxPerOrder") || 1)));
 
   if (!title || !stripHtml(description) || !venue || !startsAt) {
     redirect("/dashboard/events/new?error=missing");
@@ -68,6 +69,7 @@ export async function createEventAction(formData: FormData) {
       priceCents,
       currency,
       capacity,
+      maxPerOrder,
       allowOfflinePayment: isPaid,
       paymentInstructions: isPaid ? paymentInstructions : null,
       paymentImagePath,
@@ -104,6 +106,7 @@ export async function updateEventAction(formData: FormData) {
       priceCents,
       currency: isPaid ? parseCurrencyFromForm(formData, event.currency) : event.currency,
       capacity: parseCapacityFromForm(formData),
+      maxPerOrder: Math.max(1, Math.floor(Number(formData.get("maxPerOrder") || event.maxPerOrder))),
       allowOfflinePayment: isPaid,
       published: formData.get("published") === "on",
       paymentInstructions: isPaid

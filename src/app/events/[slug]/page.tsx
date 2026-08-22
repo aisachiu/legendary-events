@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { signupAction } from "@/app/actions/payments";
 import { EventHtml } from "@/components/EventHtml";
+import { PartyFields, QuotaNotice } from "@/components/PartyFields";
 import { Pill } from "@/components/Pills";
 import { getCurrentUser } from "@/lib/auth";
 import { formatMoney, formatWhen } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
-import { eventIsFull, formatSignupCount, occupyingWhere } from "@/lib/registrations";
+import { eventIsFull, formatSignupCount, occupyingSpotWhere } from "@/lib/registrations";
 import { eventBlurb } from "@/lib/storage";
 
 export default async function EventPage({
@@ -13,10 +14,10 @@ export default async function EventPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; remaining?: string; wanted?: string }>;
 }) {
   const { slug } = await params;
-  const { error } = await searchParams;
+  const { error, remaining, wanted } = await searchParams;
   const user = await getCurrentUser();
   const event = await prisma.event.findUnique({
     where: { slug },
@@ -30,20 +31,23 @@ export default async function EventPage({
     );
   }
 
-  const occupying = await prisma.registration.count({
-    where: occupyingWhere(event.id),
+  const occupying = await prisma.spot.count({
+    where: occupyingSpotWhere(event.id),
   });
   const full = eventIsFull(occupying, event.capacity);
 
   const mine = user
     ? await prisma.registration.findUnique({
         where: { eventId_userId: { eventId: event.id, userId: user.id } },
-        include: { payment: true },
+        include: { spots: { include: { payment: true } } },
       })
     : null;
 
   const blurb = eventBlurb(event.description, event.summary);
   const showSignup = !mine || mine.status === "CANCELLED";
+  const priceLabel = event.isPaid
+    ? `${formatMoney(event.priceCents, event.currency)} per person`
+    : null;
 
   return (
     <div className="mx-auto grid max-w-5xl gap-10 px-5 py-12 lg:grid-cols-[1.2fr_0.8fr]">
@@ -51,7 +55,7 @@ export default async function EventPage({
         <div className="flex flex-wrap gap-2">
           {event.isNetworking ? <Pill>Who&apos;s Going</Pill> : null}
           {event.isPaid ? (
-            <Pill>{formatMoney(event.priceCents, event.currency)}</Pill>
+            <Pill>{priceLabel}</Pill>
           ) : (
             <Pill tone="ok">Free</Pill>
           )}
@@ -75,11 +79,22 @@ export default async function EventPage({
       </article>
 
       <aside className="card h-fit p-6">
-        {error ? <p className="mb-4 text-sm text-red-800">{error}</p> : null}
+        {error === "quota" && remaining && wanted ? (
+          <div className="mb-4">
+            <QuotaNotice remaining={Number(remaining)} wanted={Number(wanted)} />
+          </div>
+        ) : error === "party" ? (
+          <p className="mb-4 text-sm text-red-800">Check names and the max spots for this event.</p>
+        ) : error ? (
+          <p className="mb-4 text-sm text-red-800">{error}</p>
+        ) : null}
         {mine?.status === "CONFIRMED" ? (
           <div>
             <p className="font-serif text-2xl">You are in.</p>
-            <p className="mt-2 text-sm text-[var(--mute)]">Your signup is confirmed.</p>
+            <p className="mt-2 text-sm text-[var(--mute)]">
+              {mine.spots.filter((s) => s.status !== "CANCELLED").length} named{" "}
+              {mine.spots.filter((s) => s.status !== "CANCELLED").length === 1 ? "spot" : "spots"}.
+            </p>
             <div className="mt-5 flex flex-col gap-2">
               <Link href={`/events/${slug}/confirmation`} className="btn-line">
                 View confirmation
@@ -95,7 +110,14 @@ export default async function EventPage({
           <div>
             <p className="font-serif text-2xl">A spot opened — complete payment</p>
             <p className="mt-2 text-sm text-[var(--mute)]">
-              Your name is held. Upload a receipt; the host marks you paid when it matches.
+              Total due:{" "}
+              {formatMoney(
+                mine.spots
+                  .filter((s) => s.payment && s.payment.status !== "PAID" && s.payment.status !== "REFUNDED")
+                  .reduce((sum, s) => sum + (s.payment?.amountCents ?? 0), 0),
+                event.currency,
+              )}
+              . Upload a receipt; the host can mark each person paid.
             </p>
             <Link href={`/events/${slug}/pay`} className="btn-gold mt-5">
               Go to payment
@@ -105,8 +127,8 @@ export default async function EventPage({
           <div>
             <p className="font-serif text-2xl">You are on the waitlist</p>
             <p className="mt-2 text-sm text-[var(--mute)]">
-              The host can move you into a participant spot. You will only pay if this is a paid
-              event and they promote you.
+              The host can move your group into participant spots. You will only pay if this is a
+              paid event and they promote you.
             </p>
             <Link href={`/events/${slug}/confirmation`} className="btn-line mt-5">
               View status
@@ -129,12 +151,15 @@ export default async function EventPage({
             ) : (
               <p className="text-sm text-[var(--mute)]">Signing up as {user.name}.</p>
             )}
+            {user ? (
+              <PartyFields
+                maxPerOrder={event.maxPerOrder}
+                defaultHolder={user.name}
+                requireHolderName
+              />
+            ) : null}
             {event.isNetworking ? (
               <>
-                <div>
-                  <label className="label">Preferred name (at the event)</label>
-                  <input className="field" name="preferredName" defaultValue={user?.name ?? ""} />
-                </div>
                 <div>
                   <label className="label">Title / position</label>
                   <input className="field" name="titlePosition" />

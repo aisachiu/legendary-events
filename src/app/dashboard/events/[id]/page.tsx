@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { updateEventAction } from "@/app/actions/events";
 import {
   cancelAttendanceAction,
+  markGroupPaidAction,
   markPaidAction,
   markRefundedAction,
   promoteFromWaitlistAction,
@@ -14,158 +15,6 @@ import { formatMoney, formatWhen, toDatetimeLocal } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { OCCUPYING_STATUSES } from "@/lib/registrations";
 import { canManageEvent } from "@/lib/roles";
-
-type DeskRegistration = {
-  id: string;
-  status: string;
-  preferredName: string | null;
-  user: { name: string; email: string };
-  payment: {
-    id: string;
-    status: string;
-    amountCents: number;
-    currency: string;
-    evidencePath: string | null;
-    evidenceNote: string | null;
-    refundNote: string | null;
-    refundAmountCents: number | null;
-  } | null;
-};
-
-function GuestTable({
-  rows,
-  waitlist,
-}: {
-  rows: DeskRegistration[];
-  waitlist?: boolean;
-}) {
-  return (
-    <div className="mt-6 overflow-x-auto">
-      <table className="w-full min-w-[800px] text-left text-sm">
-        <thead>
-          <tr className="border-b border-[var(--line)] text-[var(--mute)]">
-            <th className="py-2 pr-3 font-normal">Guest</th>
-            <th className="py-2 pr-3 font-normal">Status</th>
-            <th className="py-2 pr-3 font-normal">Amount</th>
-            <th className="py-2 pr-3 font-normal">Evidence</th>
-            <th className="py-2 font-normal">Host action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} className="border-b border-[var(--line)] align-top">
-              <td className="py-3 pr-3">
-                <div>{row.preferredName || row.user.name}</div>
-                <div className="text-[var(--mute)]">{row.user.email}</div>
-              </td>
-              <td className="py-3 pr-3">
-                <StatusPills
-                  registrationStatus={row.status}
-                  paymentStatus={row.payment?.status}
-                />
-                {row.payment?.refundNote ? (
-                  <p className="mt-1 text-xs text-[var(--mute)]">
-                    Refund: {row.payment.refundNote}
-                    {row.payment.refundAmountCents != null
-                      ? ` (${formatMoney(row.payment.refundAmountCents, row.payment.currency)})`
-                      : ""}
-                  </p>
-                ) : null}
-              </td>
-              <td className="py-3 pr-3">
-                {row.payment
-                  ? formatMoney(row.payment.amountCents, row.payment.currency)
-                  : "Free"}
-              </td>
-              <td className="py-3 pr-3">
-                {row.payment?.evidencePath ? (
-                  <div>
-                    <a
-                      className="underline"
-                      href={`/api/receipts/${row.payment.id}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      View receipt
-                    </a>
-                    {row.payment.evidenceNote ? (
-                      <p className="mt-1 text-[var(--mute)]">{row.payment.evidenceNote}</p>
-                    ) : null}
-                  </div>
-                ) : (
-                  "—"
-                )}
-              </td>
-              <td className="py-3">
-                <div className="flex flex-col gap-2">
-                  {waitlist ? (
-                    <form action={promoteFromWaitlistAction}>
-                      <input type="hidden" name="registrationId" value={row.id} />
-                      <button className="btn-gold" type="submit">
-                        Move to participants
-                      </button>
-                    </form>
-                  ) : null}
-                  {row.payment &&
-                  row.payment.status !== "PAID" &&
-                  row.payment.status !== "REFUNDED" ? (
-                    <div className="flex flex-wrap gap-2">
-                      <form action={markPaidAction}>
-                        <input type="hidden" name="paymentId" value={row.payment.id} />
-                        <input type="hidden" name="decision" value="paid" />
-                        <button className="btn-gold" type="submit">
-                          Mark as paid
-                        </button>
-                      </form>
-                      {row.payment.status === "AWAITING_REVIEW" ||
-                      row.payment.status === "REJECTED" ? (
-                        <form action={markPaidAction}>
-                          <input type="hidden" name="paymentId" value={row.payment.id} />
-                          <input type="hidden" name="decision" value="reject" />
-                          <button className="btn-line" type="submit">
-                            Reject
-                          </button>
-                        </form>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  {row.payment && row.payment.status === "PAID" ? (
-                    <form action={markRefundedAction} className="flex flex-wrap gap-2">
-                      <input type="hidden" name="paymentId" value={row.payment.id} />
-                      <input
-                        className="field w-28"
-                        name="refundAmount"
-                        type="number"
-                        step="0.01"
-                        placeholder="Amount"
-                        defaultValue={(row.payment.amountCents / 100).toFixed(2)}
-                      />
-                      <input className="field w-40" name="refundNote" placeholder="Refund note" />
-                      <button className="btn-line" type="submit">
-                        Mark refunded
-                      </button>
-                    </form>
-                  ) : null}
-                  <form action={cancelAttendanceAction}>
-                    <input type="hidden" name="registrationId" value={row.id} />
-                    <button className="text-sm text-red-800 underline" type="submit">
-                      Remove from ledger
-                    </button>
-                  </form>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {rows.length === 0 ? (
-        <p className="mt-4 text-[var(--mute)]">
-          {waitlist ? "No one is waiting." : "No active participants."}
-        </p>
-      ) : null}
-    </div>
-  );
-}
 
 export default async function EventDeskPage({
   params,
@@ -180,7 +29,10 @@ export default async function EventDeskPage({
     where: { id },
     include: {
       registrations: {
-        include: { user: true, payment: true },
+        include: {
+          user: true,
+          spots: { include: { payment: true }, orderBy: { createdAt: "asc" } },
+        },
         orderBy: { createdAt: "asc" },
       },
     },
@@ -193,14 +45,18 @@ export default async function EventDeskPage({
     );
   }
 
+  const occupyingSpots = event.registrations.flatMap((r) =>
+    r.spots.filter((s) => (OCCUPYING_STATUSES as readonly string[]).includes(s.status)),
+  );
   const occupying = event.registrations.filter((r) =>
-    (OCCUPYING_STATUSES as readonly string[]).includes(r.status),
+    r.spots.some((s) => (OCCUPYING_STATUSES as readonly string[]).includes(s.status)),
   );
   const waitlist = event.registrations.filter((r) => r.status === "WAITLISTED");
+  const waitlistSpots = waitlist.reduce((n, r) => n + r.spots.filter((s) => s.status === "WAITLISTED").length, 0);
   const occupancyLabel =
     event.capacity != null
-      ? `${occupying.length} / ${event.capacity} participants (you can exceed quota)`
-      : `${occupying.length} participants`;
+      ? `${occupyingSpots.length} / ${event.capacity} participants (you can exceed quota)`
+      : `${occupyingSpots.length} participants`;
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-12">
@@ -215,7 +71,7 @@ export default async function EventDeskPage({
       </div>
       <p className="mt-2 text-sm text-[var(--mute)]">
         {formatWhen(event.startsAt)} · {occupancyLabel}
-        {waitlist.length ? ` · ${waitlist.length} waitlisted` : ""}
+        {waitlistSpots ? ` · ${waitlistSpots} waitlisted` : ""}
       </p>
 
       <div className="card mt-8 p-6">
@@ -236,6 +92,7 @@ export default async function EventDeskPage({
             price: (event.priceCents / 100).toFixed(2),
             currency: event.currency,
             capacity: event.capacity,
+            maxPerOrder: event.maxPerOrder,
             paymentInstructions: event.paymentInstructions,
             paymentImageSrc: event.paymentImagePath
               ? `/api/events/${event.slug}/pay-image`
@@ -246,15 +103,200 @@ export default async function EventDeskPage({
 
       <h2 className="mt-12 font-serif text-3xl">Participants</h2>
       <p className="mt-1 text-sm text-[var(--mute)]">
-        Confirmed guests and people holding a place while payment is outstanding.
+        Grouped by the person who booked. Mark each name paid, or the whole group.
       </p>
-      <GuestTable rows={occupying} />
+      <BookingList rows={occupying} waitlist={false} />
 
       <h2 className="mt-12 font-serif text-3xl">Waiting list</h2>
       <p className="mt-1 text-sm text-[var(--mute)]">
-        Oldest first. Moving someone in does not have to respect the quota.
+        Oldest first. Moving a group in does not have to respect the quota.
       </p>
-      <GuestTable rows={waitlist} waitlist />
+      <BookingList rows={waitlist} waitlist />
+    </div>
+  );
+}
+
+function BookingList({
+  rows,
+  waitlist,
+}: {
+  rows: {
+    id: string;
+    status: string;
+    user: { name: string; email: string };
+    spots: {
+      id: string;
+      name: string;
+      isHolder: boolean;
+      status: string;
+      payment: {
+        id: string;
+        status: string;
+        amountCents: number;
+        currency: string;
+        evidencePath: string | null;
+        evidenceNote: string | null;
+        refundNote: string | null;
+        refundAmountCents: number | null;
+      } | null;
+    }[];
+  }[];
+  waitlist: boolean;
+}) {
+  if (rows.length === 0) {
+    return (
+      <p className="mt-4 text-[var(--mute)]">
+        {waitlist ? "No one is waiting." : "No active participants."}
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-6 grid gap-4">
+      {rows.map((row) => {
+        const spots = row.spots.filter((s) => s.status !== "CANCELLED");
+        const total = spots.reduce((sum, s) => sum + (s.payment?.amountCents ?? 0), 0);
+        const currency = spots.find((s) => s.payment)?.payment?.currency ?? "hkd";
+        const unpaid = spots.filter(
+          (s) => s.payment && s.payment.status !== "PAID" && s.payment.status !== "REFUNDED",
+        );
+        return (
+          <div key={row.id} className="card p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="font-serif text-xl">{row.user.name}</p>
+                <p className="text-sm text-[var(--mute)]">{row.user.email}</p>
+                <div className="mt-2">
+                  <StatusPills registrationStatus={row.status} />
+                </div>
+              </div>
+              <p className="text-sm">
+                {total > 0 ? formatMoney(total, currency) : "Free"} · {spots.length}{" "}
+                {spots.length === 1 ? "spot" : "spots"}
+              </p>
+            </div>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[640px] text-left text-sm">
+                <thead>
+                  <tr className="text-[var(--mute)]">
+                    <th className="py-1 pr-3 font-normal">Name</th>
+                    <th className="py-1 pr-3 font-normal">Status</th>
+                    <th className="py-1 pr-3 font-normal">Amount</th>
+                    <th className="py-1 pr-3 font-normal">Evidence</th>
+                    <th className="py-1 font-normal">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {spots.map((spot) => (
+                    <tr key={spot.id} className="border-t border-[var(--line)] align-top">
+                      <td className="py-2 pr-3">
+                        {spot.name}
+                        {spot.isHolder ? " · booker" : ""}
+                      </td>
+                      <td className="py-2 pr-3">
+                        <StatusPills
+                          registrationStatus={spot.status}
+                          paymentStatus={spot.payment?.status}
+                        />
+                      </td>
+                      <td className="py-2 pr-3">
+                        {spot.payment
+                          ? formatMoney(spot.payment.amountCents, spot.payment.currency)
+                          : "—"}
+                      </td>
+                      <td className="py-2 pr-3">
+                        {spot.payment?.evidencePath ? (
+                          <a
+                            className="underline"
+                            href={`/api/receipts/${spot.payment.id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Receipt
+                          </a>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="py-2">
+                        {spot.payment &&
+                        spot.payment.status !== "PAID" &&
+                        spot.payment.status !== "REFUNDED" ? (
+                          <div className="flex flex-wrap gap-2">
+                            <form action={markPaidAction}>
+                              <input type="hidden" name="paymentId" value={spot.payment.id} />
+                              <input type="hidden" name="decision" value="paid" />
+                              <button className="btn-gold" type="submit">
+                                Mark paid
+                              </button>
+                            </form>
+                            {spot.payment.status === "AWAITING_REVIEW" ||
+                            spot.payment.status === "REJECTED" ? (
+                              <form action={markPaidAction}>
+                                <input type="hidden" name="paymentId" value={spot.payment.id} />
+                                <input type="hidden" name="decision" value="reject" />
+                                <button className="btn-line" type="submit">
+                                  Reject
+                                </button>
+                              </form>
+                            ) : null}
+                          </div>
+                        ) : null}
+                        {spot.payment?.status === "PAID" ? (
+                          <form action={markRefundedAction} className="flex flex-wrap gap-2">
+                            <input type="hidden" name="paymentId" value={spot.payment.id} />
+                            <input
+                              className="field w-24"
+                              name="refundAmount"
+                              type="number"
+                              step="0.01"
+                              defaultValue={(spot.payment.amountCents / 100).toFixed(2)}
+                            />
+                            <button className="btn-line" type="submit">
+                              Refund
+                            </button>
+                          </form>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {waitlist ? (
+                <form action={promoteFromWaitlistAction}>
+                  <input type="hidden" name="registrationId" value={row.id} />
+                  <button className="btn-gold" type="submit">
+                    Move group to participants
+                  </button>
+                </form>
+              ) : null}
+              {unpaid.length > 1 ? (
+                <form action={markGroupPaidAction}>
+                  <input type="hidden" name="registrationId" value={row.id} />
+                  <button className="btn-gold" type="submit">
+                    Mark whole group paid
+                  </button>
+                </form>
+              ) : unpaid.length === 1 ? (
+                <form action={markGroupPaidAction}>
+                  <input type="hidden" name="registrationId" value={row.id} />
+                  <button className="btn-gold" type="submit">
+                    Mark group paid
+                  </button>
+                </form>
+              ) : null}
+              <form action={cancelAttendanceAction}>
+                <input type="hidden" name="registrationId" value={row.id} />
+                <button className="text-sm text-red-800 underline" type="submit">
+                  Remove booking
+                </button>
+              </form>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

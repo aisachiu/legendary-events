@@ -17,6 +17,7 @@ export type EventFormValues = {
   price?: string;
   currency?: string;
   capacity?: number | null;
+  maxPerOrder?: number;
   paymentInstructions?: string | null;
   paymentImageSrc?: string | null;
 };
@@ -134,6 +135,21 @@ export function EventForm({
             </p>
           </div>
         ) : null}
+      </div>
+
+      <div>
+        <label className="label">Max spots each person can reserve</label>
+        <input
+          className="field max-w-40"
+          type="number"
+          name="maxPerOrder"
+          min={1}
+          step={1}
+          defaultValue={values?.maxPerOrder ?? 1}
+        />
+        <p className="mt-1 text-xs text-[var(--mute)]">
+          Includes themselves. Extra names are added at signup.
+        </p>
       </div>
 
       <label className="flex items-center gap-2 text-sm">

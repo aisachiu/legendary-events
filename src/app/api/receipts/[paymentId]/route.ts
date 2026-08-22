@@ -16,12 +16,12 @@ export async function GET(
   const { paymentId } = await params;
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
-    include: { registration: { include: { event: true } } },
+    include: { spot: { include: { registration: { include: { event: true } } } } },
   });
   if (!payment?.evidencePath) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  if (!canManageEvent(user, payment.registration.event.organizerId)) {
+  if (!canManageEvent(user, payment.spot.registration.event.organizerId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
