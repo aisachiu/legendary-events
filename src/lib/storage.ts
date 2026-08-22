@@ -4,8 +4,12 @@ import { get, put } from "@vercel/blob";
 
 const LOCAL_DIR = path.join(process.cwd(), "uploads-private");
 
-function blobToken() {
-  return process.env.BLOB_READ_WRITE_TOKEN;
+function blobReady() {
+  return Boolean(
+    process.env.BLOB_STORE_ID ||
+      process.env.VERCEL_OIDC_TOKEN ||
+      process.env.BLOB_READ_WRITE_TOKEN,
+  );
 }
 
 export async function storePrivateFile(
@@ -13,14 +17,12 @@ export async function storePrivateFile(
   bytes: Buffer,
   contentType: string,
 ) {
-  const token = blobToken();
-  if (token) {
+  if (blobReady()) {
     const blob = await put(pathname, bytes, {
       access: "private",
       addRandomSuffix: true,
       allowOverwrite: true,
       contentType,
-      token,
     });
     return blob.url;
   }
@@ -43,10 +45,9 @@ export async function readPrivateFile(stored: string): Promise<{
     return { body, contentType: guessType(stored) };
   }
 
-  const token = blobToken();
-  if (!token) return null;
+  if (!blobReady()) return null;
 
-  const result = await get(stored, { access: "private", token });
+  const result = await get(stored, { access: "private" });
   if (!result || result.statusCode !== 200 || !result.stream) return null;
   const body = await streamToBuffer(result.stream);
   return {
