@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { SignOutButton } from "@/components/SignOutButton";
 import type { SessionUser } from "@/lib/auth";
-import { canHost, isSuperadmin } from "@/lib/roles";
+import { isSuperadmin } from "@/lib/roles";
 
 export function Header({ user }: { user: SessionUser | null }) {
   return (
@@ -16,7 +16,7 @@ export function Header({ user }: { user: SessionUser | null }) {
           </Link>
           {user ? (
             <Link href="/dashboard" className="text-[var(--mute)] hover:text-[var(--ink)]">
-              {canHost(user) ? "Host desk" : "Your tickets"}
+              Dashboard
             </Link>
           ) : null}
           {isSuperadmin(user) ? (
@@ -25,16 +25,16 @@ export function Header({ user }: { user: SessionUser | null }) {
             </Link>
           ) : null}
           {user ? (
-            <SignOutButton label={user.name.split(" ")[0]} />
-          ) : (
             <>
-              <Link href="/login" className="text-[var(--mute)] hover:text-[var(--ink)]">
-                Sign in
+              <Link href="/account" className="text-[var(--mute)] hover:text-[var(--ink)]">
+                Account
               </Link>
-              <Link href="/register" className="btn-gold">
-                Create account
-              </Link>
+              <SignOutButton label={user.name.split(" ")[0]} />
             </>
+          ) : (
+            <Link href="/login" className="btn-gold">
+              Sign in
+            </Link>
           )}
         </nav>
       </div>
