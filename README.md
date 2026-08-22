@@ -17,9 +17,9 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-Sign-in is **phone OTP or social login** via [Descope](https://app.descope.com). Add `NEXT_PUBLIC_DESCOPE_PROJECT_ID`, then enable **OTP (SMS)** and the social providers you want (Google, Apple, Facebook, Microsoft). Add `http://localhost:3000/login` and your Vercel URL `/login` as redirect URLs.
+Sign-in is **Google, email + password, or SMS OTP** via [Descope](https://app.descope.com) on one form (new users use the same page). Enable **Password**, **OTP (SMS)**, and **Google**. Redirect URLs: `http://localhost:3000/login`, `/account`, and the matching production URLs.
 
-Seeded roles still exist. Social users match by email; phone-only users are stored with a placeholder email. Set `SUPERADMIN_EMAIL` to your real inbox so the first social login with that address is a superadmin.
+Anyone signed in can create events. Superadmin is still `/admin` (`SUPERADMIN_EMAIL` on first login to that inbox). Phone-only users get a placeholder email until they link a real one on **Account**.
 
 Without Blob env vars, receipts are stored under `uploads-private`.
 

@@ -2,6 +2,8 @@
 
 import { createSdk, session } from "@descope/nextjs-sdk/server";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
+import { isPlaceholderName } from "@/lib/names";
 
 function emailOk(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -19,11 +21,15 @@ function claimString(token: Record<string, unknown>, ...keys: string[]) {
   return null;
 }
 
+export async function sessionJwtAction() {
+  const sess = await session();
+  return sess?.jwt ?? null;
+}
+
 export async function syncDescopeUserAction(input: {
   name?: string;
   email?: string;
   phone?: string;
-  host?: boolean;
   sessionJwt?: string;
 }) {
   let token: Record<string, unknown> | undefined;
@@ -46,9 +52,10 @@ export async function syncDescopeUserAction(input: {
   const emailRaw = (input.email || claimString(token!, "email") || "").trim().toLowerCase();
   const phone = input.phone?.trim() || claimString(token!, "phone", "phoneNumber");
   const email = emailOk(emailRaw) ? emailRaw : phone ? phoneEmail(phone) : "";
+  const tokenName = claimString(token!, "name");
   const name =
     input.name?.trim() ||
-    claimString(token!, "name") ||
+    (tokenName && !isPlaceholderName(tokenName, email, phone) ? tokenName : "") ||
     (emailOk(emailRaw) ? emailRaw.split("@")[0] : phone || "Guest");
 
   if (!emailOk(email)) {
@@ -68,29 +75,43 @@ export async function syncDescopeUserAction(input: {
     },
   });
 
-  if (existing) {
-    const user = await prisma.user.update({
-      where: { id: existing.id },
-      data: {
-        descopeUserId,
-        email,
-        name: input.name?.trim() || existing.name,
-        ...(phone ? { phone } : {}),
-        ...(input.host && existing.role === "ATTENDEE" ? { role: "ORGANIZER" } : {}),
-        ...(makeAdmin ? { role: "SUPERADMIN" } : {}),
-      },
-    });
-    return { ok: true as const, userId: user.id };
-  }
+  const user = existing
+    ? await prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          descopeUserId,
+          email,
+          name: input.name?.trim() || existing.name,
+          ...(phone ? { phone } : {}),
+          ...(makeAdmin ? { role: "SUPERADMIN" } : {}),
+        },
+      })
+    : await prisma.user.create({
+        data: {
+          descopeUserId,
+          email,
+          phone,
+          name,
+          role: makeAdmin ? "SUPERADMIN" : "ATTENDEE",
+        },
+      });
 
-  const user = await prisma.user.create({
-    data: {
-      descopeUserId,
-      email,
-      phone,
-      name,
-      role: makeAdmin ? "SUPERADMIN" : input.host ? "ORGANIZER" : "ATTENDEE",
-    },
-  });
-  return { ok: true as const, userId: user.id };
+  return {
+    ok: true as const,
+    userId: user.id,
+    needsName: isPlaceholderName(user.name, user.email, user.phone),
+  };
+}
+
+export async function updateNameAction(formData: FormData) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { ok: false as const, error: "Sign in first." };
+  }
+  const name = String(formData.get("name") || "").trim();
+  if (name.length < 2) {
+    return { ok: false as const, error: "Enter the name we should use for you." };
+  }
+  await prisma.user.update({ where: { id: user.id }, data: { name } });
+  return { ok: true as const };
 }

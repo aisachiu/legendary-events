@@ -1,5 +1,6 @@
 import { session } from "@descope/nextjs-sdk/server";
 import { prisma } from "./prisma";
+import { isPlaceholderName } from "./names";
 
 const userSelect = {
   id: true,
@@ -62,12 +63,19 @@ export async function getCurrentUser() {
 
   if (!email && !phone) return null;
 
+  const createdEmail = email || `${phone!.replace(/\D/g, "")}@phone.legendary.events`;
+  const tokenName = claimString(token!, "name");
+  const name =
+    tokenName && !isPlaceholderName(tokenName, createdEmail, phone)
+      ? tokenName
+      : tokenName || createdEmail.split("@")[0] || phone || "Guest";
+
   return prisma.user.create({
     data: {
       descopeUserId,
-      email: email || `${phone!.replace(/\D/g, "")}@phone.legendary.events`,
+      email: createdEmail,
       phone,
-      name: claimString(token!, "name") || email?.split("@")[0] || phone || "Guest",
+      name,
       role: "ATTENDEE",
     },
     select: userSelect,
