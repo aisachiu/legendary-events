@@ -66,6 +66,7 @@ async function main() {
       isNetworking: true,
       isPaid: true,
       priceCents: 4500,
+      currency: "hkd",
       allowOfflinePayment: true,
       paymentInstructions:
         "Transfer $45 to the host and put your name in the memo. Then upload a screenshot here.",
@@ -108,6 +109,8 @@ async function main() {
       isNetworking: true,
       isPaid: true,
       priceCents: 12000,
+      currency: "hkd",
+      capacity: 12,
       allowOfflinePayment: true,
       organizerId: host.id,
     },

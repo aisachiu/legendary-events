@@ -1,8 +1,13 @@
 export function formatMoney(cents: number, currency = "usd") {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-  }).format(cents / 100);
+  const code = currency.toUpperCase();
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: code,
+    }).format(cents / 100);
+  } catch {
+    return `${code} ${(cents / 100).toFixed(2)}`;
+  }
 }
 
 export function formatWhen(date: Date) {
@@ -36,6 +41,7 @@ export function toDatetimeLocal(date: Date) {
 export const registrationLabel: Record<string, string> = {
   PENDING_PAYMENT: "Payment needed",
   CONFIRMED: "Confirmed",
+  WAITLISTED: "Waitlist",
   CANCELLED: "Cancelled",
 };
 

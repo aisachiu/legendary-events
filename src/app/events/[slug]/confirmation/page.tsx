@@ -33,6 +33,7 @@ export default async function ConfirmationPage({
   }
 
   const confirmed = registration.status === "CONFIRMED";
+  const waitlisted = registration.status === "WAITLISTED";
   const waiting =
     registration.payment?.status === "AWAITING_REVIEW" && !confirmed;
 
@@ -43,9 +44,11 @@ export default async function ConfirmationPage({
           ? "Signup cancelled"
           : confirmed
             ? "You are confirmed"
-            : waiting
-              ? "Evidence is with the host"
-              : "Almost in"}
+            : waitlisted
+              ? "You are on the waitlist"
+              : waiting
+                ? "Evidence is with the host"
+                : "Almost in"}
       </h1>
       <p className="mt-3 text-[var(--mute)]">{event.title}</p>
       <div className="mt-4">
@@ -54,6 +57,12 @@ export default async function ConfirmationPage({
           paymentStatus={registration.payment?.status}
         />
       </div>
+      {waitlisted ? (
+        <p className="mt-6 text-sm leading-6 text-[var(--mute)]">
+          The event is full. The host can move you into a participant spot. You will not be asked
+          to pay until then.
+        </p>
+      ) : null}
       {waiting ? (
         <p className="mt-6 text-sm leading-6 text-[var(--mute)]">
           The host will open this once they match your upload. You will not see Who&apos;s
@@ -69,7 +78,10 @@ export default async function ConfirmationPage({
             Who&apos;s Going
           </Link>
         ) : null}
-        {!confirmed && event.isPaid && registration.status !== "CANCELLED" ? (
+        {!confirmed &&
+        !waitlisted &&
+        event.isPaid &&
+        registration.status !== "CANCELLED" ? (
           <Link href={`/events/${slug}/pay`} className="btn-gold">
             Upload receipt
           </Link>

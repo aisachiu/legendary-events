@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
-import { formatWhen } from "@/lib/format";
+import { formatWhen, registrationLabel } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { OCCUPYING_STATUSES } from "@/lib/registrations";
 import { canHost, isSuperadmin } from "@/lib/roles";
 
 export default async function DashboardPage({
@@ -27,7 +28,11 @@ export default async function DashboardPage({
         where: isSuperadmin(user) ? undefined : { organizerId: user.id },
         orderBy: { startsAt: "asc" },
         include: {
-          _count: { select: { registrations: true } },
+          _count: {
+            select: {
+              registrations: { where: { status: { in: [...OCCUPYING_STATUSES] } } },
+            },
+          },
           registrations: { include: { payment: true } },
         },
       })
@@ -66,6 +71,11 @@ export default async function DashboardPage({
             const pending = event.registrations.filter(
               (r) => r.payment?.status === "AWAITING_REVIEW",
             ).length;
+            const waitlisted = event.registrations.filter((r) => r.status === "WAITLISTED").length;
+            const occupancy =
+              event.capacity != null
+                ? `${event._count.registrations} / ${event.capacity} in`
+                : `${event._count.registrations} in`;
             return (
               <Link
                 key={event.id}
@@ -75,7 +85,8 @@ export default async function DashboardPage({
                 <div>
                   <h2 className="font-serif text-2xl">{event.title}</h2>
                   <p className="text-sm text-[var(--mute)]">
-                    {formatWhen(event.startsAt)} · {event._count.registrations} signups
+                    {formatWhen(event.startsAt)} · {occupancy}
+                    {waitlisted ? ` · ${waitlisted} waitlisted` : ""}
                     {pending ? ` · ${pending} evidence to review` : ""}
                   </p>
                 </div>
@@ -96,7 +107,7 @@ export default async function DashboardPage({
             <Link key={row.id} href={`/events/${row.event.slug}`} className="card p-5">
               <p className="font-serif text-xl">{row.event.title}</p>
               <p className="text-sm text-[var(--mute)]">
-                {row.status}
+                {registrationLabel[row.status] ?? row.status}
                 {row.payment ? ` · ${row.payment.method} ${row.payment.status}` : ""}
               </p>
             </Link>

@@ -1,8 +1,10 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { get, put } from "@vercel/blob";
+import { stripHtml } from "@/lib/event-html";
 
 const LOCAL_DIR = path.join(process.cwd(), "uploads-private");
+const LOCAL_PUBLIC_DIR = path.join(process.cwd(), "public", "uploads");
 
 function blobReady() {
   return Boolean(
@@ -79,8 +81,28 @@ function guessType(name: string) {
 
 export function eventBlurb(description: string, summary?: string | null) {
   if (summary?.trim()) return summary.trim();
-  const line = description.trim().split("\n").find((l) => l.trim());
-  return line?.trim() ?? "";
+  return stripHtml(description);
+}
+
+export async function storePublicFile(
+  pathname: string,
+  bytes: Buffer,
+  contentType: string,
+) {
+  if (blobReady()) {
+    const blob = await put(pathname, bytes, {
+      access: "public",
+      addRandomSuffix: true,
+      contentType,
+    });
+    return blob.url;
+  }
+
+  await mkdir(LOCAL_PUBLIC_DIR, { recursive: true });
+  const safe = pathname.replace(/[^a-zA-Z0-9._/-]/g, "_");
+  const unique = `${Date.now()}-${path.basename(safe)}`;
+  await writeFile(path.join(LOCAL_PUBLIC_DIR, unique), bytes);
+  return `/uploads/${unique}`;
 }
 
 export async function storeImageFromForm(file: File | null, folder: string) {

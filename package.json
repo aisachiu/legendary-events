@@ -17,11 +17,16 @@
   "dependencies": {
     "@descope/nextjs-sdk": "^0.15.68",
     "@prisma/client": "^5.22.0",
+    "@tiptap/extension-image": "^3.30.2",
+    "@tiptap/extension-placeholder": "^3.30.2",
+    "@tiptap/react": "^3.30.2",
+    "@tiptap/starter-kit": "^3.30.2",
     "@vercel/blob": "^2.8.0",
     "next": "16.3.2",
     "prisma": "^5.22.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "sanitize-html": "^2.13.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -29,6 +34,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/sanitize-html": "^2.16.1",
     "eslint": "^9",
     "eslint-config-next": "16.3.2",
     "tailwindcss": "^4",
