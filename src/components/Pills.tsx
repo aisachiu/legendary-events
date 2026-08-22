@@ -32,7 +32,7 @@ export function StatusPills({
   const regTone =
     registrationStatus === "CONFIRMED"
       ? "ok"
-      : registrationStatus === "PENDING_PAYMENT"
+      : registrationStatus === "PENDING_PAYMENT" || registrationStatus === "WAITLISTED"
         ? "warn"
         : "mute";
   return (

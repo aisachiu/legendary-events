@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { isSuperadmin } from "@/lib/roles";
 
 const ROLES = new Set(["ATTENDEE", "ORGANIZER", "SUPERADMIN"]);
-const REG_STATUSES = new Set(["PENDING_PAYMENT", "CONFIRMED", "CANCELLED"]);
+const REG_STATUSES = new Set(["PENDING_PAYMENT", "CONFIRMED", "WAITLISTED", "CANCELLED"]);
 const PAY_STATUSES = new Set([
   "UNPAID",
   "AWAITING_REVIEW",

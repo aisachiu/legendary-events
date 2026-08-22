@@ -44,6 +44,17 @@ export default async function PayPage({
     );
   }
 
+  if (registration.status === "WAITLISTED") {
+    return (
+      <div className="mx-auto max-w-lg px-5 py-16">
+        <p>You are on the waitlist. Payment opens after the host moves you in.</p>
+        <Link className="btn-gold mt-4" href={`/events/${slug}`}>
+          Back to event
+        </Link>
+      </div>
+    );
+  }
+
   const rejected = registration.payment?.status === "REJECTED";
 
   return (

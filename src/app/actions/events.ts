@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { parseCapacityFromForm, parseCurrencyFromForm } from "@/lib/currency";
+import { sanitizeEventHtml, stripHtml } from "@/lib/event-html";
 import { slugify } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { canHost, canManageEvent, isSuperadmin } from "@/lib/roles";
@@ -16,10 +18,15 @@ async function requireHost() {
   return user;
 }
 
+function parseDescription(formData: FormData, fallback = "") {
+  const raw = String(formData.get("description") || fallback);
+  return sanitizeEventHtml(raw);
+}
+
 export async function createEventAction(formData: FormData) {
   const user = await requireHost();
   const title = String(formData.get("title") || "").trim();
-  const description = String(formData.get("description") || "").trim();
+  const description = parseDescription(formData);
   const venue = String(formData.get("venue") || "").trim();
   const startsAt = String(formData.get("startsAt") || "");
   const endsAt = String(formData.get("endsAt") || "");
@@ -28,8 +35,10 @@ export async function createEventAction(formData: FormData) {
   const price = Number(formData.get("price") || 0);
   const paymentInstructions =
     String(formData.get("paymentInstructions") || "").trim() || null;
+  const currency = isPaid ? parseCurrencyFromForm(formData) : "hkd";
+  const capacity = parseCapacityFromForm(formData);
 
-  if (!title || !description || !venue || !startsAt) {
+  if (!title || !stripHtml(description) || !venue || !startsAt) {
     redirect("/dashboard/events/new?error=missing");
   }
 
@@ -41,7 +50,9 @@ export async function createEventAction(formData: FormData) {
   }
 
   const paymentImage = formData.get("paymentImage") as File | null;
-  const paymentImagePath = await storeImageFromForm(paymentImage, "pay-images");
+  const paymentImagePath = isPaid
+    ? await storeImageFromForm(paymentImage, "pay-images")
+    : null;
 
   const event = await prisma.event.create({
     data: {
@@ -55,8 +66,10 @@ export async function createEventAction(formData: FormData) {
       isNetworking,
       isPaid,
       priceCents,
+      currency,
+      capacity,
       allowOfflinePayment: isPaid,
-      paymentInstructions,
+      paymentInstructions: isPaid ? paymentInstructions : null,
       paymentImagePath,
       organizerId: user.id,
     },
@@ -72,9 +85,10 @@ export async function updateEventAction(formData: FormData) {
   if (!event || !canManageEvent(user, event.organizerId)) redirect("/dashboard");
 
   const isPaid = formData.get("isPaid") === "on";
-  const description = String(formData.get("description") || event.description).trim();
+  const description = parseDescription(formData, event.description);
   const paymentImage = formData.get("paymentImage") as File | null;
-  const uploaded = await storeImageFromForm(paymentImage, "pay-images");
+  const uploaded = isPaid ? await storeImageFromForm(paymentImage, "pay-images") : null;
+  const priceCents = isPaid ? Math.round(Number(formData.get("price") || 0) * 100) : 0;
 
   await prisma.event.update({
     where: { id },
@@ -87,11 +101,14 @@ export async function updateEventAction(formData: FormData) {
       endsAt: new Date(String(formData.get("endsAt") || event.endsAt)),
       isNetworking: formData.get("isNetworking") === "on",
       isPaid,
-      priceCents: isPaid ? Math.round(Number(formData.get("price") || 0) * 100) : 0,
+      priceCents,
+      currency: isPaid ? parseCurrencyFromForm(formData, event.currency) : event.currency,
+      capacity: parseCapacityFromForm(formData),
       allowOfflinePayment: isPaid,
       published: formData.get("published") === "on",
-      paymentInstructions:
-        String(formData.get("paymentInstructions") || "").trim() || null,
+      paymentInstructions: isPaid
+        ? String(formData.get("paymentInstructions") || "").trim() || null
+        : event.paymentInstructions,
       ...(uploaded ? { paymentImagePath: uploaded } : {}),
     },
   });

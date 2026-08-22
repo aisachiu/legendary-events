@@ -158,13 +158,41 @@ export default async function AdminPage({
                   <input className="field" name="venue" defaultValue={event.venue} />
                 </div>
                 <div>
-                  <label className="label">Price (USD)</label>
+                  <label className="label">Price</label>
                   <input
                     className="field"
                     type="number"
                     step="0.01"
                     name="price"
                     defaultValue={(event.priceCents / 100).toFixed(2)}
+                  />
+                </div>
+                <div>
+                  <label className="label">Currency</label>
+                  <input
+                    className="field"
+                    name="currencyOther"
+                    defaultValue={event.currency.toUpperCase()}
+                    maxLength={3}
+                  />
+                  <input type="hidden" name="currencyPreset" value="OTHER" />
+                </div>
+                <div>
+                  <label className="label">Quota</label>
+                  <label className="mb-2 flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name="limitCapacity"
+                      defaultChecked={event.capacity != null}
+                    />
+                    Limit participants
+                  </label>
+                  <input
+                    className="field"
+                    type="number"
+                    name="capacity"
+                    min={1}
+                    defaultValue={event.capacity ?? ""}
                   />
                 </div>
                 <div>
@@ -236,6 +264,7 @@ export default async function AdminPage({
                     <select className="field" name="status" defaultValue={row.status}>
                       <option value="PENDING_PAYMENT">PENDING_PAYMENT</option>
                       <option value="CONFIRMED">CONFIRMED</option>
+                      <option value="WAITLISTED">WAITLISTED</option>
                       <option value="CANCELLED">CANCELLED</option>
                     </select>
                   </div>

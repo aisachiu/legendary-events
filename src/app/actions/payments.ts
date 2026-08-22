@@ -4,6 +4,7 @@ import path from "path";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isHeldStatus, occupyingWhere } from "@/lib/registrations";
 import { canManageEvent, isSuperadmin } from "@/lib/roles";
 import { storePrivateFile } from "@/lib/storage";
 
@@ -33,46 +34,58 @@ export async function signupAction(formData: FormData) {
   }
 
   const profile = profileFromForm(formData);
-  const existing = await prisma.registration.findUnique({
-    where: { eventId_userId: { eventId: event.id, userId: user.id } },
-  });
-  const status =
-    existing?.status === "CONFIRMED"
-      ? "CONFIRMED"
-      : event.isPaid
-        ? "PENDING_PAYMENT"
-        : "CONFIRMED";
 
-  const registration = await prisma.registration.upsert({
-    where: { eventId_userId: { eventId: event.id, userId: user.id } },
-    update: { ...profile, status },
-    create: {
-      eventId: event.id,
-      userId: user.id,
-      status,
-      ...profile,
-    },
-  });
+  const registration = await prisma.$transaction(async (tx) => {
+    const existing = await tx.registration.findUnique({
+      where: { eventId_userId: { eventId: event.id, userId: user.id } },
+    });
+    const occupying = await tx.registration.count({
+      where: occupyingWhere(event.id, user.id),
+    });
+    const full = event.capacity != null && occupying >= event.capacity;
 
-  if (event.isPaid) {
-    await prisma.payment.upsert({
-      where: { registrationId: registration.id },
-      update: {},
+    let status: string;
+    if (existing && isHeldStatus(existing.status)) {
+      status = existing.status;
+    } else if (full) {
+      status = "WAITLISTED";
+    } else {
+      status = event.isPaid ? "PENDING_PAYMENT" : "CONFIRMED";
+    }
+
+    const row = await tx.registration.upsert({
+      where: { eventId_userId: { eventId: event.id, userId: user.id } },
+      update: { ...profile, status },
       create: {
-        registrationId: registration.id,
-        method: "UNSET",
-        status: "UNPAID",
-        amountCents: event.priceCents,
-        currency: event.currency,
+        eventId: event.id,
+        userId: user.id,
+        status,
+        ...profile,
       },
     });
+
+    if (status === "PENDING_PAYMENT" && event.isPaid) {
+      await tx.payment.upsert({
+        where: { registrationId: row.id },
+        update: {},
+        create: {
+          registrationId: row.id,
+          method: "UNSET",
+          status: "UNPAID",
+          amountCents: event.priceCents,
+          currency: event.currency,
+        },
+      });
+    }
+
+    return row;
+  });
+
+  if (registration.status === "PENDING_PAYMENT") {
+    redirect(`/events/${slug}/pay`);
   }
 
-  if (!event.isPaid || registration.status === "CONFIRMED") {
-    redirect(`/events/${slug}/confirmation`);
-  }
-
-  redirect(`/events/${slug}/pay`);
+  redirect(`/events/${slug}/confirmation`);
 }
 
 export async function submitOfflinePaymentAction(formData: FormData) {
@@ -92,6 +105,9 @@ export async function submitOfflinePaymentAction(formData: FormData) {
   if (!registration?.payment) redirect(`/events/${slug}`);
   if (registration.status === "CONFIRMED") {
     redirect(`/events/${slug}/confirmation`);
+  }
+  if (registration.status === "WAITLISTED" || registration.status === "CANCELLED") {
+    redirect(`/events/${slug}`);
   }
 
   const note = String(formData.get("evidenceNote") || "").trim();
@@ -165,6 +181,44 @@ export async function saveBioAction(formData: FormData) {
 function redirectAfterHost(user: { role: string }, next: string, eventId: string) {
   if (next.startsWith("/admin") && isSuperadmin(user)) redirect(next);
   redirect(`/dashboard/events/${eventId}`);
+}
+
+export async function promoteFromWaitlistAction(formData: FormData) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const registrationId = String(formData.get("registrationId") || "");
+  const next = String(formData.get("next") || "");
+  const registration = await prisma.registration.findUnique({
+    where: { id: registrationId },
+    include: { event: true, payment: true },
+  });
+  if (!registration || !canManageEvent(user, registration.event.organizerId)) {
+    redirect("/dashboard");
+  }
+  if (registration.status !== "WAITLISTED") {
+    redirectAfterHost(user, next, registration.eventId);
+  }
+
+  const status = registration.event.isPaid ? "PENDING_PAYMENT" : "CONFIRMED";
+  await prisma.registration.update({
+    where: { id: registration.id },
+    data: { status },
+  });
+
+  if (registration.event.isPaid && !registration.payment) {
+    await prisma.payment.create({
+      data: {
+        registrationId: registration.id,
+        method: "UNSET",
+        status: "UNPAID",
+        amountCents: registration.event.priceCents,
+        currency: registration.event.currency,
+      },
+    });
+  }
+
+  redirectAfterHost(user, next, registration.eventId);
 }
 
 export async function markPaidAction(formData: FormData) {

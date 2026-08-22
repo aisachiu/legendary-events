@@ -2,13 +2,20 @@ import Link from "next/link";
 import { Pill } from "@/components/Pills";
 import { formatMoney, formatWhen } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { formatSignupCount, OCCUPYING_STATUSES } from "@/lib/registrations";
 import { eventBlurb } from "@/lib/storage";
 
 export default async function HomePage() {
   const events = await prisma.event.findMany({
     where: { published: true },
     orderBy: { startsAt: "asc" },
-    include: { _count: { select: { registrations: true } } },
+    include: {
+      _count: {
+        select: {
+          registrations: { where: { status: { in: [...OCCUPYING_STATUSES] } } },
+        },
+      },
+    },
   });
 
   return (
@@ -43,7 +50,8 @@ export default async function HomePage() {
               </div>
             </div>
             <p className="mt-4 text-sm text-[var(--mute)]">
-              {formatWhen(event.startsAt)} · {event.venue} · {event._count.registrations} signed up
+              {formatWhen(event.startsAt)} · {event.venue} ·{" "}
+              {formatSignupCount(event._count.registrations, event.capacity)}
             </p>
           </Link>
         ))}

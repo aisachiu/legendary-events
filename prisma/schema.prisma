@@ -36,6 +36,7 @@ model Event {
   currency              String         @default("usd")
   allowOfflinePayment   Boolean        @default(true)
   published             Boolean        @default(true)
+  capacity              Int?
   paymentInstructions   String?
   paymentImagePath      String?
   organizerId           String
