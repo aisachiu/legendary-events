@@ -1,0 +1,71 @@
+import { createEventAction } from "@/app/actions/events";
+import { getCurrentUser } from "@/lib/auth";
+import { canHost } from "@/lib/roles";
+import { redirect } from "next/navigation";
+
+export default async function NewEventPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login?next=/dashboard/events/new");
+  if (!canHost(user)) redirect("/dashboard?error=host");
+  const { error } = await searchParams;
+
+  return (
+    <div className="mx-auto max-w-2xl px-5 py-12">
+      <h1 className="font-serif text-4xl">New event</h1>
+      {error ? (
+        <p className="mt-3 text-sm text-red-800">
+          {error === "price"
+            ? "Paid events need a price of at least $1."
+            : "Fill every field."}
+        </p>
+      ) : null}
+      <form action={createEventAction} className="mt-8 grid gap-4">
+        <div>
+          <label className="label">Title</label>
+          <input className="field" name="title" required />
+        </div>
+        <div>
+          <label className="label">One-line summary</label>
+          <input className="field" name="summary" required />
+        </div>
+        <div>
+          <label className="label">Description</label>
+          <textarea className="field min-h-32" name="description" required />
+        </div>
+        <div>
+          <label className="label">Venue</label>
+          <input className="field" name="venue" required />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="label">Starts</label>
+            <input className="field" type="datetime-local" name="startsAt" required />
+          </div>
+          <div>
+            <label className="label">Ends</label>
+            <input className="field" type="datetime-local" name="endsAt" required />
+          </div>
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="isNetworking" defaultChecked />
+          Networking: confirmed guests can share and read bios
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="isPaid" />
+          Paid event (guests upload a receipt; you mark them paid)
+        </label>
+        <div>
+          <label className="label">Price (USD)</label>
+          <input className="field" type="number" name="price" min="0" step="0.01" defaultValue="45" />
+        </div>
+        <button className="btn-gold w-fit" type="submit">
+          Publish event
+        </button>
+      </form>
+    </div>
+  );
+}

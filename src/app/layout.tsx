@@ -1,0 +1,38 @@
+import type { Metadata } from "next";
+import { Cormorant_Garamond, Outfit } from "next/font/google";
+import { Header } from "@/components/Header";
+import { getCurrentUser } from "@/lib/auth";
+import "./globals.css";
+
+const sans = Outfit({
+  variable: "--font-sans",
+  subsets: ["latin"],
+});
+
+const serif = Cormorant_Garamond({
+  variable: "--font-serif",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+});
+
+export const metadata: Metadata = {
+  title: "Legendary Events",
+  description: "Create events, take signups, and open the room once people are in.",
+};
+
+export const dynamic = "force-dynamic";
+
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const user = await getCurrentUser();
+  return (
+    <html lang="en" className={`${sans.variable} ${serif.variable} h-full`}>
+      <body className="min-h-full flex flex-col antialiased">
+        <Header user={user} />
+        <main className="flex-1">{children}</main>
+        <footer className="border-t border-[var(--line)] px-5 py-8 text-center text-sm text-[var(--mute)]">
+          Legendary Events — public signups, networking rooms, and receipt-based payments.
+        </footer>
+      </body>
+    </html>
+  );
+}

@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f6f1e6;
+  --ink: #1c1710;
+  --mute: #6b6256;
+  --line: #e2d8c6;
+  --gold: #b8892d;
+  --gold-ink: #6d4e12;
+  --gold-soft: #f3e4c0;
+}
+
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-serif: var(--font-serif);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+.font-serif {
+  font-family: var(--font-serif), Georgia, serif;
+}
+
+.btn-gold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  letter-spacing: 0.01em;
+}
+
+.btn-gold:hover {
+  background: #2c2418;
+}
+
+.btn-line {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: white;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+}
+
+.field {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--line);
+  background: white;
+  padding: 0.65rem 0.8rem;
+  font-size: 0.95rem;
+}
+
+.field:focus {
+  outline: 2px solid var(--gold-soft);
+  border-color: var(--gold);
+}
+
+.label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.card {
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 1.25rem;
+  box-shadow: 0 1px 0 rgba(28, 23, 16, 0.04);
+}
