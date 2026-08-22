@@ -1,15 +1,20 @@
 import Link from "next/link";
-import { cancelAttendanceAction } from "@/app/actions/payments";
-import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { cancelAttendanceAction, updatePartyAction } from "@/app/actions/payments";
+import { PartyFields, QuotaNotice } from "@/components/PartyFields";
 import { StatusPills } from "@/components/Pills";
+import { getCurrentUser } from "@/lib/auth";
+import { formatMoney } from "@/lib/format";
+import { prisma } from "@/lib/prisma";
 
 export default async function ConfirmationPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ error?: string; remaining?: string; wanted?: string }>;
 }) {
   const { slug } = await params;
+  const { error, remaining, wanted } = await searchParams;
   const user = await getCurrentUser();
   const event = await prisma.event.findUnique({ where: { slug } });
   if (!event || !user) {
@@ -22,7 +27,7 @@ export default async function ConfirmationPage({
 
   const registration = await prisma.registration.findUnique({
     where: { eventId_userId: { eventId: event.id, userId: user.id } },
-    include: { payment: true },
+    include: { spots: { include: { payment: true }, orderBy: { createdAt: "asc" } } },
   });
   if (!registration) {
     return (
@@ -32,10 +37,15 @@ export default async function ConfirmationPage({
     );
   }
 
+  const activeSpots = registration.spots.filter((s) => s.status !== "CANCELLED");
+  const dueCents = activeSpots
+    .filter((s) => s.payment && s.payment.status !== "PAID" && s.payment.status !== "REFUNDED")
+    .reduce((sum, s) => sum + (s.payment?.amountCents ?? 0), 0);
   const confirmed = registration.status === "CONFIRMED";
   const waitlisted = registration.status === "WAITLISTED";
-  const waiting =
-    registration.payment?.status === "AWAITING_REVIEW" && !confirmed;
+  const waiting = activeSpots.some((s) => s.payment?.status === "AWAITING_REVIEW") && !confirmed;
+  const holder = activeSpots.find((s) => s.isHolder);
+  const guests = activeSpots.filter((s) => !s.isHolder);
 
   return (
     <div className="mx-auto max-w-xl px-5 py-16">
@@ -52,15 +62,29 @@ export default async function ConfirmationPage({
       </h1>
       <p className="mt-3 text-[var(--mute)]">{event.title}</p>
       <div className="mt-4">
-        <StatusPills
-          registrationStatus={registration.status}
-          paymentStatus={registration.payment?.status}
-        />
+        <StatusPills registrationStatus={registration.status} />
       </div>
+      <ul className="mt-6 space-y-1 text-sm">
+        {activeSpots.map((spot) => (
+          <li key={spot.id}>
+            {spot.name}
+            {spot.isHolder ? " (you)" : ""}
+            {spot.payment
+              ? ` · ${formatMoney(spot.payment.amountCents, spot.payment.currency)} · ${spot.payment.status}`
+              : ` · ${spot.status}`}
+          </li>
+        ))}
+      </ul>
+      {event.isPaid && dueCents > 0 ? (
+        <p className="mt-4 text-sm">
+          Total due (you are the account holder):{" "}
+          <strong>{formatMoney(dueCents, event.currency)}</strong>
+        </p>
+      ) : null}
       {waitlisted ? (
         <p className="mt-6 text-sm leading-6 text-[var(--mute)]">
-          The event is full. The host can move you into a participant spot. You will not be asked
-          to pay until then.
+          The event is full or your group is waitlisted together. The host can move you in. You
+          will not be asked to pay until then.
         </p>
       ) : null}
       {waiting ? (
@@ -69,6 +93,28 @@ export default async function ConfirmationPage({
           Going until then.
         </p>
       ) : null}
+
+      {registration.status !== "CANCELLED" && event.maxPerOrder > 0 ? (
+        <form action={updatePartyAction} className="card mt-8 space-y-3 p-5">
+          <input type="hidden" name="slug" value={slug} />
+          <p className="font-serif text-2xl">People in your booking</p>
+          {error === "quota" && remaining && wanted ? (
+            <QuotaNotice remaining={Number(remaining)} wanted={Number(wanted)} />
+          ) : error === "party" ? (
+            <p className="text-sm text-red-800">Stay within {event.maxPerOrder} names.</p>
+          ) : null}
+          <PartyFields
+            maxPerOrder={event.maxPerOrder}
+            defaultHolder={holder?.name ?? user.name}
+            defaultGuests={guests.map((g) => g.name)}
+            requireHolderName
+          />
+          <button className="btn-gold" type="submit">
+            Save names
+          </button>
+        </form>
+      ) : null}
+
       <div className="mt-8 flex flex-wrap gap-3">
         <Link href={`/events/${slug}`} className="btn-line">
           Event page

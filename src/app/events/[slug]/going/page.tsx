@@ -31,8 +31,10 @@ export default async function GoingPage({
 
   const mine = await prisma.registration.findUnique({
     where: { eventId_userId: { eventId: event.id, userId: user.id } },
+    include: { spots: true },
   });
-  if (!mine || mine.status !== "CONFIRMED") {
+  const iAmConfirmed = mine?.spots.some((s) => s.status === "CONFIRMED");
+  if (!mine || !iAmConfirmed) {
     return (
       <div className="mx-auto max-w-lg px-5 py-16">
         <p className="font-serif text-3xl">Who&apos;s Going is still closed for you.</p>
@@ -47,9 +49,9 @@ export default async function GoingPage({
     );
   }
 
-  const attendees = await prisma.registration.findMany({
-    where: { eventId: event.id, status: "CONFIRMED" },
-    include: { user: true },
+  const spots = await prisma.spot.findMany({
+    where: { status: "CONFIRMED", registration: { eventId: event.id } },
+    include: { registration: { include: { user: true } } },
     orderBy: { createdAt: "asc" },
   });
 
@@ -58,7 +60,7 @@ export default async function GoingPage({
       <p className="text-xs uppercase tracking-[0.2em] text-[var(--gold-ink)]">Who&apos;s Going</p>
       <h1 className="mt-2 font-serif text-4xl">{event.title}</h1>
       <p className="mt-2 text-[var(--mute)]">
-        Confirmed guests only. {attendees.length} going.
+        Confirmed guests only. {spots.length} going.
       </p>
 
       <form action={saveBioAction} className="card mt-8 grid gap-3 p-6 sm:grid-cols-2">
@@ -95,20 +97,25 @@ export default async function GoingPage({
       </form>
 
       <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {attendees.map((row) => {
-          const display = row.preferredName || row.user.name;
+        {spots.map((spot) => {
+          const row = spot.registration;
+          const display = spot.name || row.preferredName || row.user.name;
           return (
-            <article key={row.id} className="card p-4">
+            <article key={spot.id} className="card p-4">
               <h2 className="font-serif text-xl leading-tight">{display}</h2>
-              {row.titlePosition ? (
+              {spot.isHolder && row.titlePosition ? (
                 <p className="mt-1 text-sm text-[var(--mute)]">{row.titlePosition}</p>
               ) : null}
-              {row.introBio ? (
-                <p className="mt-2 line-clamp-4 text-sm">{row.introBio}</p>
+              {spot.isHolder ? (
+                row.introBio ? (
+                  <p className="mt-2 line-clamp-4 text-sm">{row.introBio}</p>
+                ) : (
+                  <p className="mt-2 text-sm text-[var(--mute)]">No intro yet.</p>
+                )
               ) : (
-                <p className="mt-2 text-sm text-[var(--mute)]">No intro yet.</p>
+                <p className="mt-2 text-sm text-[var(--mute)]">Guest of {row.user.name}</p>
               )}
-              {row.linkedinUrl ? (
+              {spot.isHolder && row.linkedinUrl ? (
                 <a
                   className="mt-2 inline-block text-sm underline"
                   href={row.linkedinUrl}

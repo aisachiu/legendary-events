@@ -37,6 +37,7 @@ model Event {
   allowOfflinePayment   Boolean        @default(true)
   published             Boolean        @default(true)
   capacity              Int?
+  maxPerOrder           Int            @default(1)
   paymentInstructions   String?
   paymentImagePath      String?
   organizerId           String
@@ -57,15 +58,26 @@ model Registration {
   introBio      String?
   linkedinUrl   String?
   createdAt     DateTime @default(now())
-  payment       Payment?
+  spots         Spot[]
 
   @@unique([eventId, userId])
 }
 
+model Spot {
+  id             String       @id @default(cuid())
+  registrationId String
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  name           String
+  isHolder       Boolean      @default(false)
+  status         String       @default("PENDING_PAYMENT")
+  createdAt      DateTime     @default(now())
+  payment        Payment?
+}
+
 model Payment {
   id                 String       @id @default(cuid())
-  registrationId     String       @unique
-  registration       Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  spotId             String       @unique
+  spot               Spot         @relation(fields: [spotId], references: [id], onDelete: Cascade)
   method             String
   status             String
   amountCents        Int

@@ -27,18 +27,17 @@ export default async function DashboardPage({
     where: isSuperadmin(user) ? undefined : { organizerId: user.id },
     orderBy: { startsAt: "asc" },
     include: {
-      _count: {
-        select: {
-          registrations: { where: { status: { in: [...OCCUPYING_STATUSES] } } },
+      registrations: {
+        include: {
+          spots: { include: { payment: true } },
         },
       },
-      registrations: { include: { payment: true } },
     },
   });
 
   const mine = await prisma.registration.findMany({
     where: { userId: user.id },
-    include: { event: true, payment: true },
+    include: { event: true, spots: { include: { payment: true } } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -59,14 +58,22 @@ export default async function DashboardPage({
 
       <section className="mt-10 grid gap-4">
         {events.map((event) => {
-          const pending = event.registrations.filter(
-            (r) => r.payment?.status === "AWAITING_REVIEW",
-          ).length;
-          const waitlisted = event.registrations.filter((r) => r.status === "WAITLISTED").length;
+          const occupying = event.registrations.reduce(
+            (n, r) =>
+              n + r.spots.filter((s) => (OCCUPYING_STATUSES as readonly string[]).includes(s.status)).length,
+            0,
+          );
+          const pending = event.registrations.reduce(
+            (n, r) =>
+              n + r.spots.filter((s) => s.payment?.status === "AWAITING_REVIEW").length,
+            0,
+          );
+          const waitlisted = event.registrations.reduce(
+            (n, r) => n + r.spots.filter((s) => s.status === "WAITLISTED").length,
+            0,
+          );
           const occupancy =
-            event.capacity != null
-              ? `${event._count.registrations} / ${event.capacity} in`
-              : `${event._count.registrations} in`;
+            event.capacity != null ? `${occupying} / ${event.capacity} in` : `${occupying} in`;
           return (
             <Link
               key={event.id}
@@ -98,7 +105,7 @@ export default async function DashboardPage({
               <p className="font-serif text-xl">{row.event.title}</p>
               <p className="text-sm text-[var(--mute)]">
                 {registrationLabel[row.status] ?? row.status}
-                {row.payment ? ` · ${row.payment.method} ${row.payment.status}` : ""}
+                {row.spots.length > 1 ? ` · ${row.spots.length} spots` : ""}
               </p>
             </Link>
           ))}
