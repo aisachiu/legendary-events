@@ -107,7 +107,9 @@ export default async function ConfirmationPage({
             maxPerOrder={event.maxPerOrder}
             defaultHolder={holder?.name ?? user.name}
             defaultGuests={guests.map((g) => g.name)}
+            defaultShowOnGoing={activeSpots.map((s) => s.showOnGoing)}
             requireHolderName
+            showGoingOptIn={event.isNetworking}
           />
           <button className="btn-gold" type="submit">
             Save names

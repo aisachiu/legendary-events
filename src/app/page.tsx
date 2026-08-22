@@ -3,7 +3,6 @@ import { Pill } from "@/components/Pills";
 import { formatMoney, formatWhen } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { formatSignupCount, OCCUPYING_STATUSES } from "@/lib/registrations";
-import { eventBlurb } from "@/lib/storage";
 
 export default async function HomePage() {
   const events = await prisma.event.findMany({
@@ -24,10 +23,10 @@ export default async function HomePage() {
   return (
     <div className="mx-auto max-w-5xl px-5 py-12">
       <p className="text-xs uppercase tracking-[0.2em] text-[var(--gold-ink)]">
-        Public rooms, private tables
+        Welcome
       </p>
       <h1 className="mt-3 font-serif text-5xl leading-tight text-[var(--ink)] sm:text-6xl">
-        Host something worth showing up for.
+        Legendary Events
       </h1>
       <p className="mt-4 max-w-2xl text-lg text-[var(--mute)]">
         Create an event, take signups from anyone, collect payment receipts, and — for
@@ -39,9 +38,6 @@ export default async function HomePage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="font-serif text-3xl">{event.title}</h2>
-                <p className="mt-1 text-[var(--mute)]">
-                  {eventBlurb(event.description, event.summary)}
-                </p>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {event.isNetworking ? <Pill>Who&apos;s Going</Pill> : <Pill tone="mute">Open</Pill>}

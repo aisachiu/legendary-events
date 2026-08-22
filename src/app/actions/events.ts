@@ -8,6 +8,7 @@ import { slugify } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { canHost, canManageEvent, isSuperadmin } from "@/lib/roles";
 import { eventBlurb, storeImageFromForm } from "@/lib/storage";
+import { isThemeId } from "@/lib/themes";
 
 async function requireHost() {
   const user = await getCurrentUser();
@@ -21,6 +22,12 @@ async function requireHost() {
 function parseDescription(formData: FormData, fallback = "") {
   const raw = String(formData.get("description") || fallback);
   return sanitizeEventHtml(raw);
+}
+
+function parseThemeId(formData: FormData): string | null {
+  const raw = String(formData.get("themeId") || "").trim();
+  if (!raw || raw === "inherit") return null;
+  return isThemeId(raw) ? raw : null;
 }
 
 export async function createEventAction(formData: FormData) {
@@ -73,6 +80,7 @@ export async function createEventAction(formData: FormData) {
       allowOfflinePayment: isPaid,
       paymentInstructions: isPaid ? paymentInstructions : null,
       paymentImagePath,
+      themeId: parseThemeId(formData),
       organizerId: user.id,
     },
   });
@@ -109,6 +117,7 @@ export async function updateEventAction(formData: FormData) {
       maxPerOrder: Math.max(1, Math.floor(Number(formData.get("maxPerOrder") || event.maxPerOrder))),
       allowOfflinePayment: isPaid,
       published: formData.get("published") === "on",
+      themeId: parseThemeId(formData),
       paymentInstructions: isPaid
         ? String(formData.get("paymentInstructions") || "").trim() || null
         : event.paymentInstructions,

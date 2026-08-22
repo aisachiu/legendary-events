@@ -21,6 +21,11 @@ model User {
   markedPayments Payment[]       @relation("MarkedBy")
 }
 
+model SiteSettings {
+  id          String @id @default("default")
+  siteThemeId String @default("wisdom-bamboo")
+}
+
 model Event {
   id                    String         @id @default(cuid())
   slug                  String         @unique
@@ -38,6 +43,7 @@ model Event {
   published             Boolean        @default(true)
   capacity              Int?
   maxPerOrder           Int            @default(1)
+  themeId               String?
   paymentInstructions   String?
   paymentImagePath      String?
   organizerId           String
@@ -69,6 +75,7 @@ model Spot {
   registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
   name           String
   isHolder       Boolean      @default(false)
+  showOnGoing    Boolean      @default(true)
   status         String       @default("PENDING_PAYMENT")
   createdAt      DateTime     @default(now())
   payment        Payment?

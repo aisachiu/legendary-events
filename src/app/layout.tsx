@@ -3,6 +3,7 @@ import { Cormorant_Garamond, Outfit } from "next/font/google";
 import { DescopeProviders } from "@/components/DescopeProviders";
 import { Header } from "@/components/Header";
 import { getCurrentUser } from "@/lib/auth";
+import { getSiteThemeId } from "@/lib/site-settings";
 import "./globals.css";
 
 const sans = Outfit({
@@ -29,8 +30,9 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const user = await getCurrentUser();
+  const siteTheme = await getSiteThemeId();
   return (
-    <html lang="en" className={`${sans.variable} ${serif.variable} h-full`}>
+    <html lang="en" data-theme={siteTheme} className={`${sans.variable} ${serif.variable} h-full`}>
       <body className="min-h-full flex flex-col antialiased">
         <DescopeProviders>
           <Header user={user} />
