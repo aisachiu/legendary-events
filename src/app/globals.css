@@ -1,10 +1,42 @@
 @import "tailwindcss";
 
 :root {
+  --paper: #ebe6d6;
+  --ink: #141810;
+  --mute: #5c6358;
+  --line: #d4cfc0;
+  --accent: #4a8f6a;
+  --accent-deep: #2a4a38;
+  --accent-ink: #1e3d2c;
+  --accent-soft: #d8ebe0;
+  --gold: var(--accent);
+  --gold-ink: var(--accent-ink);
+  --gold-soft: var(--accent-soft);
+}
+
+[data-theme="wisdom-bamboo"] {
+  --paper: #ebe6d6;
+  --ink: #141810;
+  --mute: #5c6358;
+  --line: #d4cfc0;
+  --accent: #4a8f6a;
+  --accent-deep: #2a4a38;
+  --accent-ink: #1e3d2c;
+  --accent-soft: #d8ebe0;
+  --gold: #4a8f6a;
+  --gold-ink: #1e3d2c;
+  --gold-soft: #d8ebe0;
+}
+
+[data-theme="classic-paper"] {
   --paper: #f6f1e6;
   --ink: #1c1710;
   --mute: #6b6256;
   --line: #e2d8c6;
+  --accent: #b8892d;
+  --accent-deep: #6d4e12;
+  --accent-ink: #6d4e12;
+  --accent-soft: #f3e4c0;
   --gold: #b8892d;
   --gold-ink: #6d4e12;
   --gold-soft: #f3e4c0;
@@ -19,6 +51,14 @@ body {
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+[data-theme="wisdom-bamboo"] body,
+.event-theme-scope[data-theme="wisdom-bamboo"] {
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(circle at 20% 10%, rgba(74, 143, 106, 0.08), transparent 45%),
+    radial-gradient(circle at 80% 90%, rgba(42, 74, 56, 0.06), transparent 40%);
 }
 
 .font-serif {
@@ -136,4 +176,41 @@ body {
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+.event-theme-scope {
+  color: var(--ink);
+}
+
+@media print {
+  .guest-list-no-print,
+  header,
+  footer {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .guest-list-page {
+    max-width: none;
+    padding: 0;
+  }
+
+  .guest-list-table {
+    border-collapse: collapse;
+  }
+
+  .guest-list-table th,
+  .guest-list-table td {
+    border-bottom: 1px solid #ccc;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .guest-list-party {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }

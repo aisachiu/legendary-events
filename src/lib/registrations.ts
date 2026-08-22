@@ -51,3 +51,8 @@ export function parseGuestNames(formData: FormData, fallbackHolder: string) {
     .filter(Boolean);
   return { holder, extras };
 }
+
+export function parseShowOnGoing(formData: FormData, partySize: number) {
+  const flags = formData.getAll("showOnGoing").map((v) => v === "1" || v === "on");
+  return Array.from({ length: partySize }, (_, i) => flags[i] ?? true);
+}

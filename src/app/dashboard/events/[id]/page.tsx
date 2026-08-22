@@ -2,11 +2,15 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { updateEventAction } from "@/app/actions/events";
 import {
+  addSpotHostAction,
   cancelAttendanceAction,
   markGroupPaidAction,
   markPaidAction,
   markRefundedAction,
   promoteFromWaitlistAction,
+  removeSpotHostAction,
+  setGroupTotalAction,
+  updateSpotAmountAction,
 } from "@/app/actions/payments";
 import { EventForm } from "@/components/EventForm";
 import { StatusPills } from "@/components/Pills";
@@ -65,9 +69,14 @@ export default async function EventDeskPage({
       </Link>
       <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
         <h1 className="font-serif text-4xl">{event.title}</h1>
-        <Link href={`/events/${event.slug}`} className="btn-line">
-          Public page
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href={`/dashboard/events/${event.id}/guest-list`} className="btn-line">
+            Guest list
+          </Link>
+          <Link href={`/events/${event.slug}`} className="btn-line">
+            Public page
+          </Link>
+        </div>
       </div>
       <p className="mt-2 text-sm text-[var(--mute)]">
         {formatWhen(event.startsAt)} · {occupancyLabel}
@@ -97,6 +106,7 @@ export default async function EventDeskPage({
             paymentImageSrc: event.paymentImagePath
               ? `/api/events/${event.slug}/pay-image`
               : null,
+            themeId: event.themeId,
           }}
         />
       </div>
@@ -105,13 +115,13 @@ export default async function EventDeskPage({
       <p className="mt-1 text-sm text-[var(--mute)]">
         Grouped by the person who booked. Mark each name paid, or the whole group.
       </p>
-      <BookingList rows={occupying} waitlist={false} />
+      <BookingList rows={occupying} waitlist={false} maxPerOrder={event.maxPerOrder} />
 
       <h2 className="mt-12 font-serif text-3xl">Waiting list</h2>
       <p className="mt-1 text-sm text-[var(--mute)]">
         Oldest first. Moving a group in does not have to respect the quota.
       </p>
-      <BookingList rows={waitlist} waitlist />
+      <BookingList rows={waitlist} waitlist maxPerOrder={event.maxPerOrder} />
     </div>
   );
 }
@@ -119,6 +129,7 @@ export default async function EventDeskPage({
 function BookingList({
   rows,
   waitlist,
+  maxPerOrder,
 }: {
   rows: {
     id: string;
@@ -142,6 +153,7 @@ function BookingList({
     }[];
   }[];
   waitlist: boolean;
+  maxPerOrder: number;
 }) {
   if (rows.length === 0) {
     return (
@@ -200,9 +212,28 @@ function BookingList({
                         />
                       </td>
                       <td className="py-2 pr-3">
-                        {spot.payment
-                          ? formatMoney(spot.payment.amountCents, spot.payment.currency)
-                          : "—"}
+                        {spot.payment &&
+                        spot.payment.status !== "PAID" &&
+                        spot.payment.status !== "REFUNDED" ? (
+                          <form action={updateSpotAmountAction} className="flex items-center gap-2">
+                            <input type="hidden" name="paymentId" value={spot.payment.id} />
+                            <input
+                              className="field w-24"
+                              name="amount"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              defaultValue={(spot.payment.amountCents / 100).toFixed(2)}
+                            />
+                            <button className="btn-line text-xs" type="submit">
+                              Set
+                            </button>
+                          </form>
+                        ) : spot.payment ? (
+                          formatMoney(spot.payment.amountCents, spot.payment.currency)
+                        ) : (
+                          "—"
+                        )}
                       </td>
                       <td className="py-2 pr-3">
                         {spot.payment?.evidencePath ? (
@@ -257,13 +288,52 @@ function BookingList({
                             </button>
                           </form>
                         ) : null}
+                        {spot.payment?.status !== "PAID" && spots.length > 1 ? (
+                          <form action={removeSpotHostAction} className="mt-2">
+                            <input type="hidden" name="spotId" value={spot.id} />
+                            <button className="text-xs text-red-800 underline" type="submit">
+                              Remove
+                            </button>
+                          </form>
+                        ) : null}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap items-end gap-2">
+              {spots.length < maxPerOrder ? (
+                <form action={addSpotHostAction} className="flex flex-wrap items-end gap-2">
+                  <input type="hidden" name="registrationId" value={row.id} />
+                  <div>
+                    <label className="label">Add person</label>
+                    <input className="field w-40" name="name" required placeholder="Name" />
+                  </div>
+                  <button className="btn-line" type="submit">
+                    Add
+                  </button>
+                </form>
+              ) : null}
+              {unpaid.length > 1 ? (
+                <form action={setGroupTotalAction} className="flex flex-wrap items-end gap-2">
+                  <input type="hidden" name="registrationId" value={row.id} />
+                  <div>
+                    <label className="label">Set group total</label>
+                    <input
+                      className="field w-28"
+                      name="groupTotal"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <button className="btn-line" type="submit">
+                    Split
+                  </button>
+                </form>
+              ) : null}
               {waitlist ? (
                 <form action={promoteFromWaitlistAction}>
                   <input type="hidden" name="registrationId" value={row.id} />

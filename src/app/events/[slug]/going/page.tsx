@@ -54,6 +54,7 @@ export default async function GoingPage({
     include: { registration: { include: { user: true } } },
     orderBy: { createdAt: "asc" },
   });
+  const visibleSpots = spots.filter((spot) => spot.showOnGoing);
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-12">
@@ -97,7 +98,7 @@ export default async function GoingPage({
       </form>
 
       <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {spots.map((spot) => {
+        {visibleSpots.map((spot) => {
           const row = spot.registration;
           const display = spot.name || row.preferredName || row.user.name;
           return (

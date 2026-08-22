@@ -7,7 +7,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { formatMoney, formatWhen } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { eventIsFull, formatSignupCount, occupyingSpotWhere } from "@/lib/registrations";
-import { eventBlurb } from "@/lib/storage";
 
 export default async function EventPage({
   params,
@@ -43,7 +42,6 @@ export default async function EventPage({
       })
     : null;
 
-  const blurb = eventBlurb(event.description, event.summary);
   const showSignup = !mine || mine.status === "CANCELLED";
   const priceLabel = event.isPaid
     ? `${formatMoney(event.priceCents, event.currency)} per person`
@@ -62,7 +60,6 @@ export default async function EventPage({
           {full ? <Pill tone="warn">Full</Pill> : null}
         </div>
         <h1 className="mt-4 font-serif text-5xl">{event.title}</h1>
-        {blurb ? <p className="mt-3 text-lg text-[var(--mute)]">{blurb}</p> : null}
         <p className="mt-6 text-sm text-[var(--mute)]">
           {formatWhen(event.startsAt)} — {formatWhen(event.endsAt)}
           <br />
@@ -108,7 +105,7 @@ export default async function EventPage({
           </div>
         ) : mine?.status === "PENDING_PAYMENT" ? (
           <div>
-            <p className="font-serif text-2xl">A spot opened — complete payment</p>
+            <p className="font-serif text-2xl">Complete Payment to Confirm Your Spot</p>
             <p className="mt-2 text-sm text-[var(--mute)]">
               Total due:{" "}
               {formatMoney(
@@ -117,7 +114,7 @@ export default async function EventPage({
                   .reduce((sum, s) => sum + (s.payment?.amountCents ?? 0), 0),
                 event.currency,
               )}
-              . Upload a receipt; the host can mark each person paid.
+              . You can upload payment evidence here or directly inform the host.
             </p>
             <Link href={`/events/${slug}/pay`} className="btn-gold mt-5">
               Go to payment
@@ -156,6 +153,7 @@ export default async function EventPage({
                 maxPerOrder={event.maxPerOrder}
                 defaultHolder={user.name}
                 requireHolderName
+                showGoingOptIn={event.isNetworking}
               />
             ) : null}
             {event.isNetworking ? (

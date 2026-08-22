@@ -5,6 +5,7 @@ import {
   deleteUserAdminAction,
   updatePaymentAdminAction,
   updateRegistrationAdminAction,
+  updateSiteSettingsAction,
   updateUserAdminAction,
 } from "@/app/actions/admin";
 import {
@@ -17,6 +18,7 @@ import { formatMoney, formatWhen, toDatetimeLocal } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { isSuperadmin } from "@/lib/roles";
 import { StatusPills } from "@/components/Pills";
+import { themeList } from "@/lib/themes";
 
 export default async function AdminPage({
   searchParams,
@@ -28,7 +30,7 @@ export default async function AdminPage({
   if (!isSuperadmin(user)) redirect("/dashboard");
   const { error } = await searchParams;
 
-  const [users, events, registrations, payments] = await Promise.all([
+  const [users, events, registrations, payments, siteSettings] = await Promise.all([
     prisma.user.findMany({ orderBy: { createdAt: "desc" } }),
     prisma.event.findMany({
       orderBy: { startsAt: "asc" },
@@ -44,6 +46,7 @@ export default async function AdminPage({
         spot: { include: { registration: { include: { user: true, event: true } } } },
       },
     }),
+    prisma.siteSettings.findUnique({ where: { id: "default" } }),
   ]);
 
   return (
@@ -64,6 +67,29 @@ export default async function AdminPage({
       {error === "user-exists" || error === "user-create" ? (
         <p className="mt-4 text-sm text-red-800">Could not create that user. Check the email.</p>
       ) : null}
+
+      <section className="mt-12">
+        <h2 className="font-serif text-3xl">Site theme</h2>
+        <form action={updateSiteSettingsAction} className="card mt-4 flex flex-wrap items-end gap-3 p-4">
+          <div>
+            <label className="label">Default theme</label>
+            <select
+              className="field min-w-48"
+              name="siteThemeId"
+              defaultValue={siteSettings?.siteThemeId ?? "wisdom-bamboo"}
+            >
+              {themeList.map((theme) => (
+                <option key={theme.id} value={theme.id}>
+                  {theme.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button className="btn-gold" type="submit">
+            Save site theme
+          </button>
+        </form>
+      </section>
 
       <section className="mt-12">
         <h2 className="font-serif text-3xl">Add user</h2>

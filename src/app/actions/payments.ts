@@ -9,6 +9,7 @@ import {
   isHeldStatus,
   occupyingSpotWhere,
   parseGuestNames,
+  parseShowOnGoing,
   remainingSeats,
 } from "@/lib/registrations";
 import { canManageEvent, isSuperadmin } from "@/lib/roles";
@@ -82,6 +83,7 @@ export async function signupAction(formData: FormData) {
   if (names.length < 1 || names.length > event.maxPerOrder) {
     redirect(`/events/${slug}?error=party`);
   }
+  const showOnGoing = event.isNetworking ? parseShowOnGoing(formData, names.length) : names.map(() => true);
 
   const waitlistGroup = formData.get("waitlistGroup") === "on";
 
@@ -134,6 +136,7 @@ export async function signupAction(formData: FormData) {
         registrationId: row.id,
         name,
         isHolder: i === 0,
+        showOnGoing: showOnGoing[i],
         status,
       })),
     });
@@ -161,6 +164,7 @@ export async function updatePartyAction(formData: FormData) {
   if (names.length < 1 || names.length > event.maxPerOrder) {
     redirect(`/events/${slug}/confirmation?error=party`);
   }
+  const showOnGoing = event.isNetworking ? parseShowOnGoing(formData, names.length) : names.map(() => true);
 
   const waitlistGroup = formData.get("waitlistGroup") === "on";
 
@@ -205,7 +209,12 @@ export async function updatePartyAction(formData: FormData) {
       if (current) {
         await tx.spot.update({
           where: { id: current.id },
-          data: { name: names[i], isHolder: i === 0, status: spotStatus },
+          data: {
+            name: names[i],
+            isHolder: i === 0,
+            status: spotStatus,
+            showOnGoing: showOnGoing[i],
+          },
         });
       } else {
         const created = await tx.spot.create({
@@ -213,6 +222,7 @@ export async function updatePartyAction(formData: FormData) {
             registrationId: registration.id,
             name: names[i],
             isHolder: i === 0,
+            showOnGoing: showOnGoing[i],
             status: spotStatus,
           },
         });
@@ -485,6 +495,156 @@ export async function markRefundedAction(formData: FormData) {
   });
 
   redirectAfterHost(user, next, payment.spot.registration.eventId);
+}
+
+export async function addSpotHostAction(formData: FormData) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const registrationId = String(formData.get("registrationId") || "");
+  const name = String(formData.get("name") || "").trim();
+  const next = String(formData.get("next") || "");
+  if (!name) redirect("/dashboard");
+
+  const registration = await prisma.registration.findUnique({
+    where: { id: registrationId },
+    include: { event: true, spots: { include: { payment: true } } },
+  });
+  if (!registration || !canManageEvent(user, registration.event.organizerId)) {
+    redirect("/dashboard");
+  }
+  if (registration.status === "CANCELLED") redirectAfterHost(user, next, registration.eventId);
+
+  const active = registration.spots.filter((s) => s.status !== "CANCELLED");
+  if (active.length >= registration.event.maxPerOrder) {
+    redirectAfterHost(user, next, registration.eventId);
+  }
+
+  const status =
+    registration.status === "WAITLISTED"
+      ? "WAITLISTED"
+      : registration.event.isPaid
+        ? "PENDING_PAYMENT"
+        : "CONFIRMED";
+
+  await prisma.$transaction(async (tx) => {
+    const created = await tx.spot.create({
+      data: {
+        registrationId: registration.id,
+        name,
+        isHolder: false,
+        status,
+      },
+    });
+    await ensureSpotPayments(tx, registration.event, [created]);
+    await syncBookingStatus(tx, registration.id);
+  });
+
+  redirectAfterHost(user, next, registration.eventId);
+}
+
+export async function removeSpotHostAction(formData: FormData) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const spotId = String(formData.get("spotId") || "");
+  const next = String(formData.get("next") || "");
+  const spot = await prisma.spot.findUnique({
+    where: { id: spotId },
+    include: { payment: true, registration: { include: { event: true, spots: true } } },
+  });
+  if (!spot || !canManageEvent(user, spot.registration.event.organizerId)) {
+    redirect("/dashboard");
+  }
+
+  const active = spot.registration.spots.filter((s) => s.status !== "CANCELLED");
+  if (active.length <= 1) {
+    redirectAfterHost(user, next, spot.registration.eventId);
+  }
+  if (spot.payment?.status === "PAID") {
+    redirectAfterHost(user, next, spot.registration.eventId);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (spot.payment) {
+      await tx.payment.delete({ where: { id: spot.payment.id } });
+    }
+    await tx.spot.delete({ where: { id: spot.id } });
+    await syncBookingStatus(tx, spot.registrationId);
+  });
+
+  redirectAfterHost(user, next, spot.registration.eventId);
+}
+
+export async function updateSpotAmountAction(formData: FormData) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const paymentId = String(formData.get("paymentId") || "");
+  const amount = Number(formData.get("amount") || 0);
+  const next = String(formData.get("next") || "");
+  const payment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+    include: { spot: { include: { registration: { include: { event: true } } } } },
+  });
+  if (!payment || !canManageEvent(user, payment.spot.registration.event.organizerId)) {
+    redirect("/dashboard");
+  }
+  if (payment.status === "PAID" || payment.status === "REFUNDED") {
+    redirectAfterHost(user, next, payment.spot.registration.eventId);
+  }
+
+  const amountCents = Math.max(0, Math.round(amount * 100));
+  await prisma.payment.update({
+    where: { id: payment.id },
+    data: { amountCents },
+  });
+
+  redirectAfterHost(user, next, payment.spot.registration.eventId);
+}
+
+export async function setGroupTotalAction(formData: FormData) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const registrationId = String(formData.get("registrationId") || "");
+  const total = Number(formData.get("groupTotal") || 0);
+  const next = String(formData.get("next") || "");
+  const registration = await prisma.registration.findUnique({
+    where: { id: registrationId },
+    include: { event: true, spots: { include: { payment: true } } },
+  });
+  if (!registration || !canManageEvent(user, registration.event.organizerId)) {
+    redirect("/dashboard");
+  }
+
+  const unpaid = registration.spots.filter(
+    (s) =>
+      s.status !== "CANCELLED" &&
+      s.payment &&
+      s.payment.status !== "PAID" &&
+      s.payment.status !== "REFUNDED",
+  );
+  if (unpaid.length === 0) {
+    redirectAfterHost(user, next, registration.eventId);
+  }
+
+  const totalCents = Math.max(0, Math.round(total * 100));
+  const base = Math.floor(totalCents / unpaid.length);
+  let remainder = totalCents - base * unpaid.length;
+
+  await prisma.$transaction(async (tx) => {
+    for (const spot of unpaid) {
+      const cents = base + (remainder > 0 ? 1 : 0);
+      if (remainder > 0) remainder -= 1;
+      await tx.payment.update({
+        where: { id: spot.payment!.id },
+        data: { amountCents: cents },
+      });
+    }
+  });
+
+  redirectAfterHost(user, next, registration.eventId);
 }
 
 export async function cancelAttendanceAction(formData: FormData) {

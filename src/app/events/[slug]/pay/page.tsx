@@ -64,12 +64,12 @@ export default async function PayPage({
 
   return (
     <div className="mx-auto max-w-2xl px-5 py-12">
-      <h1 className="font-serif text-4xl">Payment for {event.title}</h1>
+      <h1 className="font-serif text-4xl">Complete Payment to Confirm Your Spot</h1>
       <p className="mt-2 text-[var(--mute)]">
         {formatMoney(event.priceCents, event.currency)} per person. You are the account holder.
         Total due: <strong>{formatMoney(dueCents, event.currency)}</strong> for {dueSpots.length}{" "}
-        {dueSpots.length === 1 ? "spot" : "spots"}. Follow the host&apos;s instructions, then
-        upload one receipt for the group.
+        {dueSpots.length === 1 ? "spot" : "spots"}. You can upload payment evidence here or
+        directly inform the host.
       </p>
       <ul className="mt-4 space-y-1 text-sm">
         {registration.spots

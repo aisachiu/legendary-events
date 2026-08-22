@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { DescriptionEditor } from "@/components/DescriptionEditor";
 import { CURRENCY_PRESETS, currencyPresetValue } from "@/lib/currency";
+import { themeList } from "@/lib/themes";
 
 export type EventFormValues = {
   id?: string;
@@ -20,6 +21,7 @@ export type EventFormValues = {
   maxPerOrder?: number;
   paymentInstructions?: string | null;
   paymentImageSrc?: string | null;
+  themeId?: string | null;
 };
 
 export function EventForm({
@@ -107,6 +109,21 @@ export function EventForm({
         />
         Who&apos;s Going Page: confirmed guests can see each other
       </label>
+
+      <div>
+        <label className="label">Theme</label>
+        <select className="field max-w-md" name="themeId" defaultValue={values?.themeId ?? "inherit"}>
+          <option value="inherit">Site default</option>
+          {themeList.map((theme) => (
+            <option key={theme.id} value={theme.id}>
+              {theme.name}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-[var(--mute)]">
+          Overrides the site-wide theme on this event&apos;s public pages.
+        </p>
+      </div>
 
       <div className="grid gap-3">
         <label className="flex items-center gap-2 text-sm">

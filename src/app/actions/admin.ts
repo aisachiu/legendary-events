@@ -158,3 +158,14 @@ export async function updatePaymentAdminAction(formData: FormData) {
   }
   redirect("/admin");
 }
+
+export async function updateSiteSettingsAction(formData: FormData) {
+  await requireSuperadmin();
+  const siteThemeId = String(formData.get("siteThemeId") || "wisdom-bamboo");
+  await prisma.siteSettings.upsert({
+    where: { id: "default" },
+    update: { siteThemeId },
+    create: { id: "default", siteThemeId },
+  });
+  redirect("/admin");
+}
