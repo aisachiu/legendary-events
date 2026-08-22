@@ -62,12 +62,12 @@ export default async function AdminPage({
         </p>
       ) : null}
       {error === "user-exists" || error === "user-create" ? (
-        <p className="mt-4 text-sm text-red-800">Could not create that user. Check email and password.</p>
+        <p className="mt-4 text-sm text-red-800">Could not create that user. Check the email.</p>
       ) : null}
 
       <section className="mt-12">
         <h2 className="font-serif text-3xl">Add user</h2>
-        <form action={createUserAdminAction} className="card mt-4 grid gap-3 p-4 sm:grid-cols-5">
+        <form action={createUserAdminAction} className="card mt-4 grid gap-3 p-4 sm:grid-cols-4">
           <div>
             <label className="label">Name</label>
             <input className="field" name="name" required />
@@ -75,10 +75,6 @@ export default async function AdminPage({
           <div>
             <label className="label">Email</label>
             <input className="field" name="email" type="email" required />
-          </div>
-          <div>
-            <label className="label">Password</label>
-            <input className="field" name="password" type="password" minLength={8} required />
           </div>
           <div>
             <label className="label">Role</label>
@@ -101,7 +97,7 @@ export default async function AdminPage({
         <div className="mt-4 grid gap-4">
           {users.map((row) => (
             <div key={row.id} className="card p-4">
-              <form action={updateUserAdminAction} className="grid gap-3 sm:grid-cols-5">
+              <form action={updateUserAdminAction} className="grid gap-3 sm:grid-cols-4">
                 <input type="hidden" name="id" value={row.id} />
                 <div>
                   <label className="label">Name</label>
@@ -118,10 +114,6 @@ export default async function AdminPage({
                     <option value="ORGANIZER">ORGANIZER</option>
                     <option value="SUPERADMIN">SUPERADMIN</option>
                   </select>
-                </div>
-                <div>
-                  <label className="label">New password</label>
-                  <input className="field" name="password" type="password" minLength={8} placeholder="Leave blank" />
                 </div>
                 <div className="flex items-end">
                   <button className="btn-gold" type="submit">

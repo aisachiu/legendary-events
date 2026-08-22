@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { logoutAction } from "@/app/actions/auth";
+import { SignOutButton } from "@/components/SignOutButton";
 import type { SessionUser } from "@/lib/auth";
 import { canHost, isSuperadmin } from "@/lib/roles";
 
@@ -25,11 +25,7 @@ export function Header({ user }: { user: SessionUser | null }) {
             </Link>
           ) : null}
           {user ? (
-            <form action={logoutAction}>
-              <button type="submit" className="text-[var(--mute)] hover:text-[var(--ink)]">
-                Sign out {user.name.split(" ")[0]}
-              </button>
-            </form>
+            <SignOutButton label={user.name.split(" ")[0]} />
           ) : (
             <>
               <Link href="/login" className="text-[var(--mute)] hover:text-[var(--ink)]">

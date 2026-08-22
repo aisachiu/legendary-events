@@ -17,13 +17,11 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-Demo accounts (password `legendary` — **change these in production**):
+Sign-in is **phone OTP or social login** via [Descope](https://app.descope.com). Add `NEXT_PUBLIC_DESCOPE_PROJECT_ID`, then enable **OTP (SMS)** and the social providers you want (Google, Apple, Facebook, Microsoft). Add `http://localhost:3000/login` and your Vercel URL `/login` as redirect URLs.
 
-- Host: `host@legendary.events`
-- Guest: `guest@legendary.events`
-- Superadmin: `admin@legendary.events` → `/admin`
+Seeded roles still exist. Social users match by email; phone-only users are stored with a placeholder email. Set `SUPERADMIN_EMAIL` to your real inbox so the first social login with that address is a superadmin.
 
-Without a `BLOB_READ_WRITE_TOKEN`, receipts are stored under `public/uploads`.
+Without Blob env vars, receipts are stored under `uploads-private`.
 
 ## GitHub and Vercel
 
@@ -34,7 +32,7 @@ cd ~/legendary-events
 /opt/homebrew/bin/gh repo create legendary-events --public --source=. --remote=origin --push
 ```
 
-Then in Vercel: **Import** that repo → Storage → **Neon** (`DATABASE_URL` pooled, `DIRECT_URL` direct) → **Blob** → env `AUTH_SECRET` (long random) and `NEXT_PUBLIC_APP_URL` (`https://your-app.vercel.app`) → Deploy. Build runs `prisma migrate deploy`. Seed once with `npx prisma db seed` if you want demo users.
+Then in Vercel: **Import** that repo → Storage → **Neon** (`DATABASE_URL` pooled, `DIRECT_URL` direct) → **Blob** → env `NEXT_PUBLIC_APP_URL` and `NEXT_PUBLIC_DESCOPE_PROJECT_ID` → Deploy. Build runs `prisma migrate deploy`. Seed once with `npx prisma db seed` if you want demo users.
 
 Point a Network Solutions domain at Vercel later with a CNAME.
 

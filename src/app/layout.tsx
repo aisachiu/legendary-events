@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Outfit } from "next/font/google";
+import { DescopeProviders } from "@/components/DescopeProviders";
 import { Header } from "@/components/Header";
 import { getCurrentUser } from "@/lib/auth";
 import "./globals.css";
@@ -27,11 +28,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${sans.variable} ${serif.variable} h-full`}>
       <body className="min-h-full flex flex-col antialiased">
-        <Header user={user} />
-        <main className="flex-1">{children}</main>
-        <footer className="border-t border-[var(--line)] px-5 py-8 text-center text-sm text-[var(--mute)]">
-          Legendary Events — public signups, networking rooms, and receipt-based payments.
-        </footer>
+        <DescopeProviders>
+          <Header user={user} />
+          <main className="flex-1">{children}</main>
+          <footer className="border-t border-[var(--line)] px-5 py-8 text-center text-sm text-[var(--mute)]">
+            Legendary Events — public signups, networking rooms, and receipt-based payments.
+          </footer>
+        </DescopeProviders>
       </body>
     </html>
   );

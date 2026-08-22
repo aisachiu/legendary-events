@@ -11,7 +11,8 @@ datasource db {
 model User {
   id             String          @id @default(cuid())
   email          String          @unique
-  passwordHash   String
+  phone          String?         @unique
+  descopeUserId  String?         @unique
   name           String
   role           String          @default("ATTENDEE")
   createdAt      DateTime        @default(now())

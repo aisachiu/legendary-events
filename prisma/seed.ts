@@ -1,11 +1,8 @@
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const passwordHash = await bcrypt.hash("legendary", 10);
-
   const host = await prisma.user.upsert({
     where: { email: "host@legendary.events" },
     update: {},
@@ -13,7 +10,6 @@ async function main() {
       email: "host@legendary.events",
       name: "Amina Gold",
       role: "ORGANIZER",
-      passwordHash,
     },
   });
 
@@ -24,7 +20,6 @@ async function main() {
       email: "guest@legendary.events",
       name: "Jordan Vale",
       role: "ATTENDEE",
-      passwordHash,
     },
   });
 
@@ -35,7 +30,6 @@ async function main() {
       email: "admin@legendary.events",
       name: "Legendary Admin",
       role: "SUPERADMIN",
-      passwordHash,
     },
   });
 
@@ -120,7 +114,7 @@ async function main() {
   });
 
   console.log(
-    "Seeded host@ / guest@ / admin@legendary.events (password legendary). Change these in production.",
+    "Seeded host@ / guest@ / admin@legendary.events. They sign in with a Descope email or WhatsApp OTP to those emails.",
   );
 }
 

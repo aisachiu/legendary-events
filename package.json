@@ -15,9 +15,9 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@descope/nextjs-sdk": "^0.15.68",
     "@prisma/client": "^5.22.0",
     "@vercel/blob": "^2.8.0",
-    "bcryptjs": "^3.0.3",
     "next": "16.3.2",
     "prisma": "^5.22.0",
     "react": "19.2.8",
@@ -26,7 +26,6 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/bcryptjs": "^3.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

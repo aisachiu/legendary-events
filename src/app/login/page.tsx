@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { loginAction } from "@/app/actions/auth";
+import { AuthOtpForm } from "@/components/AuthOtpForm";
 
 export default async function LoginPage({
   searchParams,
@@ -10,30 +10,20 @@ export default async function LoginPage({
   return (
     <div className="mx-auto max-w-md px-5 py-16">
       <h1 className="font-serif text-4xl">Sign in</h1>
-      {error ? <p className="mt-3 text-sm text-red-800">{error}</p> : null}
-      <form action={loginAction} className="mt-8 space-y-4">
-        <input type="hidden" name="next" value={next || "/"} />
-        <div>
-          <label className="label">Email</label>
-          <input className="field" name="email" type="email" required />
-        </div>
-        <div>
-          <label className="label">Password</label>
-          <input className="field" name="password" type="password" required />
-        </div>
-        <button className="btn-gold" type="submit">
-          Sign in
-        </button>
-      </form>
-      <p className="mt-6 text-sm text-[var(--mute)]">
-        Demo host: host@legendary.events / legendary
-        <br />
-        Demo guest: guest@legendary.events / legendary
-        <br />
-        Superadmin: admin@legendary.events / legendary
+      <p className="mt-3 text-sm text-[var(--mute)]">
+        We send a text, or you can continue with a social account. No password.
       </p>
-      <p className="mt-4 text-sm">
-        No account? <Link className="underline" href="/register">Create one</Link>
+      {error ? <p className="mt-3 text-sm text-red-800">{error}</p> : null}
+      {process.env.NEXT_PUBLIC_DESCOPE_PROJECT_ID ? (
+        <AuthOtpForm next={next || "/"} mode="login" />
+      ) : (
+        <p className="mt-8 text-sm text-red-800">
+          Set <code>NEXT_PUBLIC_DESCOPE_PROJECT_ID</code>, enable phone OTP and social connectors
+          in Descope, then restart.
+        </p>
+      )}
+      <p className="mt-6 text-sm">
+        New here? <Link className="underline" href={`/register?next=${encodeURIComponent(next || "/")}`}>Create an account</Link>
       </p>
     </div>
   );

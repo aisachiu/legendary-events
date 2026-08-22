@@ -1,64 +1,76 @@
-import { createHmac, timingSafeEqual } from "crypto";
-import { cookies } from "next/headers";
-import bcrypt from "bcryptjs";
+import { session } from "@descope/nextjs-sdk/server";
 import { prisma } from "./prisma";
 
-const COOKIE = "le_session";
+const userSelect = {
+  id: true,
+  email: true,
+  name: true,
+  role: true,
+} as const;
 
-function secret() {
-  return process.env.AUTH_SECRET || "dev-only-change-me";
-}
-
-function sign(userId: string) {
-  const hmac = createHmac("sha256", secret()).update(userId).digest("hex");
-  return `${userId}.${hmac}`;
-}
-
-function verify(token: string) {
-  const idx = token.indexOf(".");
-  if (idx < 1) return null;
-  const userId = token.slice(0, idx);
-  const given = token.slice(idx + 1);
-  const expected = createHmac("sha256", secret()).update(userId).digest("hex");
-  const a = Buffer.from(given);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-  return userId;
-}
-
-export async function hashPassword(password: string) {
-  return bcrypt.hash(password, 10);
-}
-
-export async function checkPassword(password: string, hash: string) {
-  return bcrypt.compare(password, hash);
-}
-
-export async function setSession(userId: string) {
-  const jar = await cookies();
-  jar.set(COOKIE, sign(userId), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
-}
-
-export async function clearSession() {
-  const jar = await cookies();
-  jar.delete(COOKIE);
+function claimString(token: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = token[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
 }
 
 export async function getCurrentUser() {
-  const jar = await cookies();
-  const token = jar.get(COOKIE)?.value;
-  if (!token) return null;
-  const userId = verify(token);
-  if (!userId) return null;
-  return prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, email: true, name: true, role: true },
+  if (!process.env.NEXT_PUBLIC_DESCOPE_PROJECT_ID) return null;
+
+  let token: Record<string, unknown> | undefined;
+  try {
+    const sess = await session();
+    token = sess?.token as Record<string, unknown> | undefined;
+  } catch {
+    return null;
+  }
+  const descopeUserId = claimString(token ?? {}, "sub");
+  if (!descopeUserId) return null;
+
+  const emailRaw = claimString(token!, "email");
+  const email = emailRaw ? emailRaw.toLowerCase() : null;
+  const phone = claimString(token!, "phone", "phoneNumber");
+
+  const found = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { descopeUserId },
+        ...(email ? [{ email }] : []),
+        ...(phone ? [{ phone }] : []),
+      ],
+    },
+    select: { ...userSelect, descopeUserId: true, phone: true },
+  });
+
+  if (found) {
+    const needsLink =
+      found.descopeUserId !== descopeUserId || (phone && found.phone !== phone);
+    if (!needsLink) {
+      return { id: found.id, email: found.email, name: found.name, role: found.role };
+    }
+    return prisma.user.update({
+      where: { id: found.id },
+      data: {
+        descopeUserId,
+        ...(phone && !found.phone ? { phone } : {}),
+      },
+      select: userSelect,
+    });
+  }
+
+  if (!email && !phone) return null;
+
+  return prisma.user.create({
+    data: {
+      descopeUserId,
+      email: email || `${phone!.replace(/\D/g, "")}@phone.legendary.events`,
+      phone,
+      name: claimString(token!, "name") || email?.split("@")[0] || phone || "Guest",
+      role: "ATTENDEE",
+    },
+    select: userSelect,
   });
 }
 

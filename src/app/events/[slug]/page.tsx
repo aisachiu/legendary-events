@@ -98,26 +98,12 @@ export default async function EventPage({
             <input type="hidden" name="slug" value={slug} />
             <p className="font-serif text-2xl">Sign up</p>
             {!user ? (
-              <>
-                <div>
-                  <label className="label">Name</label>
-                  <input className="field" name="name" required />
-                </div>
-                <div>
-                  <label className="label">Email</label>
-                  <input className="field" name="email" type="email" required />
-                </div>
-                <div>
-                  <label className="label">Password</label>
-                  <input className="field" name="password" type="password" minLength={8} required />
-                </div>
-                <p className="text-xs text-[var(--mute)]">
-                  Already have an account?{" "}
-                  <Link className="underline" href={`/login?next=/events/${slug}`}>
-                    Sign in
-                  </Link>
-                </p>
-              </>
+              <p className="text-sm text-[var(--mute)]">
+                <Link className="underline" href={`/login?next=/events/${slug}`}>
+                  Sign in with your phone or a social account
+                </Link>{" "}
+                first, then you can hold a place.
+              </p>
             ) : (
               <p className="text-sm text-[var(--mute)]">Signing up as {user.name}.</p>
             )}
@@ -145,9 +131,11 @@ export default async function EventPage({
                 </div>
               </>
             ) : null}
-            <button className="btn-gold w-full" type="submit">
-              {event.isPaid ? "Hold my place" : "Confirm my place"}
-            </button>
+            {user ? (
+              <button className="btn-gold w-full" type="submit">
+                {event.isPaid ? "Hold my place" : "Confirm my place"}
+              </button>
+            ) : null}
           </form>
         )}
       </aside>

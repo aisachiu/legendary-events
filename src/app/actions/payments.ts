@@ -2,35 +2,13 @@
 
 import path from "path";
 import { redirect } from "next/navigation";
-import { getCurrentUser, hashPassword, setSession } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageEvent, isSuperadmin } from "@/lib/roles";
 import { storePrivateFile } from "@/lib/storage";
 
-async function ensureUser(formData: FormData) {
-  const existing = await getCurrentUser();
-  if (existing) return existing;
-
-  const name = String(formData.get("name") || "").trim();
-  const email = String(formData.get("email") || "").trim().toLowerCase();
-  const password = String(formData.get("password") || "");
-  if (!name || !email || password.length < 8) {
-    return null;
-  }
-
-  const taken = await prisma.user.findUnique({ where: { email } });
-  if (taken) return null;
-
-  const user = await prisma.user.create({
-    data: {
-      name,
-      email,
-      passwordHash: await hashPassword(password),
-      role: "ATTENDEE",
-    },
-  });
-  await setSession(user.id);
-  return { id: user.id, email: user.email, name: user.name, role: user.role };
+async function ensureUser() {
+  return getCurrentUser();
 }
 
 function profileFromForm(formData: FormData) {
@@ -49,11 +27,9 @@ export async function signupAction(formData: FormData) {
     redirect("/");
   }
 
-  const user = await ensureUser(formData);
+  const user = await ensureUser();
   if (!user) {
-    redirect(
-      `/events/${slug}?error=${encodeURIComponent("Create an account (or sign in) with name, email, and an 8+ character password.")}`,
-    );
+    redirect(`/login?next=/events/${slug}`);
   }
 
   const profile = profileFromForm(formData);

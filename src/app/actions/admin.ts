@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { getCurrentUser, hashPassword } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isSuperadmin } from "@/lib/roles";
 
@@ -25,9 +25,8 @@ export async function createUserAdminAction(formData: FormData) {
   await requireSuperadmin();
   const name = String(formData.get("name") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
-  const password = String(formData.get("password") || "");
   const role = String(formData.get("role") || "ATTENDEE");
-  if (!name || !email || password.length < 8 || !ROLES.has(role)) {
+  if (!name || !email || !ROLES.has(role)) {
     redirect("/admin?error=user-create");
   }
   const taken = await prisma.user.findUnique({ where: { email } });
@@ -36,7 +35,6 @@ export async function createUserAdminAction(formData: FormData) {
     data: {
       name,
       email,
-      passwordHash: await hashPassword(password),
       role,
     },
   });
@@ -49,7 +47,6 @@ export async function updateUserAdminAction(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const role = String(formData.get("role") || "");
-  const password = String(formData.get("password") || "");
 
   if (!id || !name || !email || !ROLES.has(role)) redirect("/admin");
 
@@ -69,7 +66,6 @@ export async function updateUserAdminAction(formData: FormData) {
       name,
       email,
       role,
-      ...(password.length >= 8 ? { passwordHash: await hashPassword(password) } : {}),
     },
   });
   redirect("/admin");
