@@ -25,16 +25,18 @@ Demo accounts (password `legendary` — **change these in production**):
 
 Without a `BLOB_READ_WRITE_TOKEN`, receipts are stored under `public/uploads`.
 
-## Vercel
+## GitHub and Vercel
 
-1. Push this repo to GitHub and import it in Vercel.
-2. Add a **Neon** Postgres database. Set `DATABASE_URL` (pooled) and `DIRECT_URL` (direct).
-3. Add a **Vercel Blob** store (`BLOB_READ_WRITE_TOKEN` is injected).
-4. Set `AUTH_SECRET` (long random string) and `NEXT_PUBLIC_APP_URL` to `https://your-app.vercel.app`.
-5. Deploy. The `vercel-build` script runs `prisma migrate deploy`.
-6. Seed once against Neon if you want demo users: `npx prisma db seed` with production `DATABASE_URL` / `DIRECT_URL`.
+Log in once: `gh auth login` (use `/opt/homebrew/bin/gh` if `gh` is the wrong binary) and, in the browser, [vercel.com](https://vercel.com).
 
-Point a Network Solutions domain at Vercel later with a CNAME; not required for the first `*.vercel.app` URL.
+```bash
+cd ~/legendary-events
+/opt/homebrew/bin/gh repo create legendary-events --public --source=. --remote=origin --push
+```
+
+Then in Vercel: **Import** that repo → Storage → **Neon** (`DATABASE_URL` pooled, `DIRECT_URL` direct) → **Blob** → env `AUTH_SECRET` (long random) and `NEXT_PUBLIC_APP_URL` (`https://your-app.vercel.app`) → Deploy. Build runs `prisma migrate deploy`. Seed once with `npx prisma db seed` if you want demo users.
+
+Point a Network Solutions domain at Vercel later with a CNAME.
 
 ## What is in this version
 
