@@ -14,7 +14,11 @@ export default async function AccountPage({
   return (
     <div className="mx-auto max-w-md px-5 py-16">
       <h1 className="font-serif text-4xl">{welcome === "1" ? "One more thing" : "Account"}</h1>
-      {welcome === "1" ? null : (
+      {welcome === "1" ? (
+        <p className="mt-3 text-sm text-[var(--mute)]">
+          You&apos;re signed in. Add the name hosts and guests should see.
+        </p>
+      ) : (
         <p className="mt-3 text-sm text-[var(--mute)]">
           Your name shows on sign-out and on events you host. Link Google, a phone, or email — phone
           and email use magic links.

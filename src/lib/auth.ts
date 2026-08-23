@@ -66,9 +66,7 @@ export async function getCurrentUser() {
   const createdEmail = email || `${phone!.replace(/\D/g, "")}@phone.legendary.events`;
   const tokenName = claimString(token!, "name");
   const name =
-    tokenName && !isPlaceholderName(tokenName, createdEmail, phone)
-      ? tokenName
-      : tokenName || createdEmail.split("@")[0] || phone || "Guest";
+    tokenName && !isPlaceholderName(tokenName, createdEmail, phone) ? tokenName : "Guest";
 
   return prisma.user.create({
     data: {

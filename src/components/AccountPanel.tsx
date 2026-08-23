@@ -45,7 +45,8 @@ export function AccountPanel({
   const descopeUser = user as DescopeUser | undefined;
   const verifying = useRef(false);
 
-  const [displayName, setDisplayName] = useState(name);
+  // Welcome only runs when sync flagged needsName — start blank, don't show "Guest"/email local-part.
+  const [displayName, setDisplayName] = useState(() => (welcome ? "" : name));
   const [phone, setPhone] = useState("");
   const [phoneSent, setPhoneSent] = useState(false);
   const [email, setEmail] = useState("");
@@ -224,16 +225,20 @@ export function AccountPanel({
   if (welcome) {
     return (
       <form onSubmit={saveName} className="mt-8 space-y-4">
-        <p className="text-sm text-[var(--mute)]">What should we call you?</p>
+        <p className="text-sm text-[var(--mute)]">
+          Hosts and guests see this name on events. One quick step after your magic link.
+        </p>
         {error ? <p className="text-sm text-red-800">{error}</p> : null}
         <div>
           <label className="label">Your name</label>
           <input
             className="field"
-            value={displayName === "Guest" ? "" : displayName}
+            autoComplete="name"
+            value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             required
             minLength={2}
+            autoFocus
           />
         </div>
         <button className="btn-gold" type="submit" disabled={busy}>

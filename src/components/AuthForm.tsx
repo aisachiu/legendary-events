@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { syncDescopeUserAction } from "@/app/actions/auth";
 import { errText, jwtFromResp, toE164, urlFromResp } from "@/lib/descope-client";
+import { savePendingName, takePendingName } from "@/lib/names";
 
 function finishPath(next: string) {
   return next || "/";
@@ -35,6 +36,7 @@ export function AuthForm({
   const [emailSent, setEmailSent] = useState(false);
   const [phone, setPhone] = useState("");
   const [phoneSent, setPhoneSent] = useState(false);
+  const [pendingName, setPendingName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const finishing = useRef(false);
@@ -46,7 +48,7 @@ export function AuthForm({
     const synced = await syncDescopeUserAction({
       email: extra?.email,
       phone: extra?.phone,
-      name: extra?.name,
+      name: extra?.name || takePendingName(),
       sessionJwt,
     });
     if (!synced.ok) {
@@ -120,6 +122,11 @@ export function AuthForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, isSessionLoading]);
 
+  function onPendingNameChange(value: string) {
+    setPendingName(value);
+    savePendingName(value);
+  }
+
   async function continueWithGoogle() {
     setError("");
     setBusy(true);
@@ -192,6 +199,8 @@ export function AuthForm({
       setBusy(false);
     }
   }
+
+  const linkSent = emailSent || phoneSent;
 
   return (
     <div className={variant === "compact" ? "space-y-4" : "mt-8 space-y-6"}>
@@ -306,6 +315,24 @@ export function AuthForm({
           </>
         )}
       </div>
+
+      {linkSent ? (
+        <div className="space-y-2 rounded-lg border border-[var(--line)] p-4">
+          <label className="label">While you wait — what should we call you?</label>
+          <input
+            className="field"
+            type="text"
+            autoComplete="name"
+            placeholder="Your name"
+            value={pendingName}
+            onChange={(e) => onPendingNameChange(e.target.value)}
+          />
+          <p className="text-xs text-[var(--mute)]">
+            Optional if you&apos;ve signed in before. Saved for when you open the link in this
+            browser.
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -53,10 +53,14 @@ export async function syncDescopeUserAction(input: {
   const phone = input.phone?.trim() || claimString(token!, "phone", "phoneNumber");
   const email = emailOk(emailRaw) ? emailRaw : phone ? phoneEmail(phone) : "";
   const tokenName = claimString(token!, "name");
-  const name =
-    input.name?.trim() ||
-    (tokenName && !isPlaceholderName(tokenName, email, phone) ? tokenName : "") ||
-    (emailOk(emailRaw) ? emailRaw.split("@")[0] : phone || "Guest");
+  const incomingName = input.name?.trim() || "";
+  const realIncoming =
+    incomingName.length >= 2 && !isPlaceholderName(incomingName, email, phone)
+      ? incomingName
+      : "";
+  const realToken =
+    tokenName && !isPlaceholderName(tokenName, email, phone) ? tokenName : "";
+  const name = realIncoming || realToken || "Guest";
 
   if (!emailOk(email)) {
     return { ok: false as const, error: "Sign-in did not return an email or phone we can store." };
@@ -81,7 +85,7 @@ export async function syncDescopeUserAction(input: {
         data: {
           descopeUserId,
           email,
-          name: input.name?.trim() || existing.name,
+          name: realIncoming || existing.name,
           ...(phone ? { phone } : {}),
           ...(makeAdmin ? { role: "SUPERADMIN" } : {}),
         },
