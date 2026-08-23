@@ -26,6 +26,23 @@ export async function sessionJwtAction() {
   return sess?.jwt ?? null;
 }
 
+/** Email-first auth: returning users already have a Descope-linked row. */
+export async function lookupEmailAction(emailRaw: string) {
+  const email = emailRaw.trim().toLowerCase();
+  if (!emailOk(email)) {
+    return { ok: false as const, error: "Enter a valid email." };
+  }
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { descopeUserId: true },
+  });
+  return {
+    ok: true as const,
+    email,
+    exists: Boolean(user?.descopeUserId),
+  };
+}
+
 export async function syncDescopeUserAction(input: {
   name?: string;
   email?: string;
