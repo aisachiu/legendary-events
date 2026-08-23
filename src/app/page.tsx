@@ -29,8 +29,7 @@ export default async function HomePage() {
         Legendary Events
       </h1>
       <p className="mt-4 max-w-2xl text-lg text-[var(--mute)]">
-        Create an event, take signups from anyone, collect payment receipts, and — for
-        nights with Who&apos;s Going — open attendee cards only after someone is confirmed.
+        Events platforms - create events, get signups, track payments, and more.
       </p>
       <div className="mt-10 grid gap-5">
         {events.map((event) => (
