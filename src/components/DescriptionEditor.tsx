@@ -30,14 +30,26 @@ function ToolbarButton({
   );
 }
 
+function asEditorHtml(value?: string) {
+  const raw = (value ?? "").trim();
+  if (!raw) return "";
+  if (/<[a-z][\s\S]*>/i.test(raw)) return raw;
+  return raw
+    .split(/\n{2,}/)
+    .map((block) => `<p>${block.replace(/\n/g, "<br>")}</p>`)
+    .join("");
+}
+
 export function DescriptionEditor({
   name,
   defaultValue,
+  placeholder = "Tell guests what to expect…",
 }: {
   name: string;
   defaultValue?: string;
+  placeholder?: string;
 }) {
-  const [html, setHtml] = useState(defaultValue ?? "");
+  const [html, setHtml] = useState(asEditorHtml(defaultValue));
   const [uploading, setUploading] = useState(false);
 
   const editor = useEditor({
@@ -49,9 +61,9 @@ export function DescriptionEditor({
         link: { openOnClick: false, autolink: true },
       }),
       Image.configure({ inline: false }),
-      Placeholder.configure({ placeholder: "Tell guests what to expect…" }),
+      Placeholder.configure({ placeholder }),
     ],
-    content: defaultValue || "",
+    content: asEditorHtml(defaultValue),
     onUpdate: ({ editor: next }) => setHtml(next.getHTML()),
     editorProps: {
       attributes: {

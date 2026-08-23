@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { submitOfflinePaymentAction } from "@/app/actions/payments";
 import { getCurrentUser } from "@/lib/auth";
+import { stripHtml } from "@/lib/event-html";
 import { formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { EventHtml } from "@/components/EventHtml";
 import { StatusPills } from "@/components/Pills";
 
 export default async function PayPage({
@@ -96,22 +98,12 @@ export default async function PayPage({
       ) : null}
       {error ? <p className="mt-4 text-sm text-red-800">{error}</p> : null}
 
-      {event.paymentInstructions || event.paymentImagePath ? (
+      {event.paymentInstructions && stripHtml(event.paymentInstructions) ? (
         <div className="card mt-8 p-6">
           <h2 className="font-serif text-2xl">How to pay</h2>
-          {event.paymentInstructions ? (
-            <p className="mt-3 whitespace-pre-wrap text-[var(--mute)]">
-              {event.paymentInstructions}
-            </p>
-          ) : null}
-          {event.paymentImagePath ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={`/api/events/${slug}/pay-image`}
-              alt="Payment details"
-              className="mt-4 max-h-72 w-auto rounded-lg border border-[var(--line)]"
-            />
-          ) : null}
+          <div className="mt-3">
+            <EventHtml className="event-prose leading-7" html={event.paymentInstructions} />
+          </div>
         </div>
       ) : null}
 

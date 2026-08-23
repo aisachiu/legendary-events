@@ -1,9 +1,9 @@
 import { sanitizeEventHtml } from "@/lib/event-html";
 
-export function EventHtml({ html }: { html: string }) {
+export function EventHtml({ html, className }: { html: string; className?: string }) {
   return (
     <div
-      className="event-prose mt-8 leading-7"
+      className={className ?? "event-prose mt-8 leading-7"}
       dangerouslySetInnerHTML={{ __html: sanitizeEventHtml(html) }}
     />
   );

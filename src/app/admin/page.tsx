@@ -20,6 +20,7 @@ import { isSuperadmin } from "@/lib/roles";
 import { publicEventUrl } from "@/lib/slugs";
 import { DEFAULT_SITE_THEME, themeList } from "@/lib/themes";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
+import { DescriptionEditor } from "@/components/DescriptionEditor";
 import { StatusPills } from "@/components/Pills";
 
 export default async function AdminPage({
@@ -278,10 +279,10 @@ export default async function AdminPage({
                 </label>
                 <div className="sm:col-span-2">
                   <label className="label">Payment instructions</label>
-                  <textarea
-                    className="field min-h-20"
+                  <DescriptionEditor
                     name="paymentInstructions"
                     defaultValue={event.paymentInstructions ?? ""}
+                    placeholder="Bank details, FPS, Venmo, QR code, what to write in the transfer memo…"
                   />
                 </div>
                 <div className="sm:col-span-2">

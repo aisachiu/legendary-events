@@ -23,7 +23,6 @@ export type EventFormValues = {
   capacity?: number | null;
   maxPerOrder?: number;
   paymentInstructions?: string | null;
-  paymentImageSrc?: string | null;
   themeId?: string | null;
   contactDetails?: string | null;
 };
@@ -273,24 +272,14 @@ export function EventForm({
           </div>
           <div>
             <label className="label">Payment instructions</label>
-            <textarea
-              className="field min-h-24"
+            <DescriptionEditor
               name="paymentInstructions"
-              placeholder="Bank details, FPS, Venmo, what to write in the transfer memo…"
               defaultValue={values?.paymentInstructions ?? ""}
+              placeholder="Bank details, FPS, Venmo, QR code, what to write in the transfer memo…"
             />
-          </div>
-          <div>
-            <label className="label">Payment image (QR code, optional)</label>
-            <input className="field" type="file" name="paymentImage" accept="image/*" />
-            {values?.paymentImageSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={values.paymentImageSrc}
-                alt=""
-                className="mt-3 max-h-40 rounded-lg border border-[var(--line)]"
-              />
-            ) : null}
+            <p className="mt-1 text-xs text-[var(--mute)]">
+              Guests see this on the payment page. Use Image to add a QR code or screenshot.
+            </p>
           </div>
         </>
       ) : null}

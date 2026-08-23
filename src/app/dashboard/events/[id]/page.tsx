@@ -112,9 +112,6 @@ export default async function EventDeskPage({
             capacity: event.capacity,
             maxPerOrder: event.maxPerOrder,
             paymentInstructions: event.paymentInstructions,
-            paymentImageSrc: event.paymentImagePath
-              ? `/api/events/${event.slug}/pay-image`
-              : null,
             themeId: event.themeId,
             contactDetails: event.contactDetails,
           }}

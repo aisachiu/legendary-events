@@ -8,7 +8,7 @@ import { sanitizeEventHtml, stripHtml } from "@/lib/event-html";
 import { prisma } from "@/lib/prisma";
 import { canHost, canManageEvent, isSuperadmin } from "@/lib/roles";
 import { allocateEventSlug, eventSlugTaken, parseEventSlug } from "@/lib/slugs";
-import { eventBlurb, storeImageFromForm } from "@/lib/storage";
+import { eventBlurb } from "@/lib/storage";
 import { isThemeId } from "@/lib/themes";
 
 async function requireHost() {
@@ -34,6 +34,11 @@ function parseThemeId(formData: FormData): string | null | undefined {
 
 function parseContactDetails(formData: FormData) {
   return String(formData.get("contactDetails") || "").trim() || null;
+}
+
+function parsePaymentInstructions(formData: FormData, fallback = "") {
+  const html = sanitizeEventHtml(String(formData.get("paymentInstructions") || fallback));
+  return stripHtml(html) ? html : null;
 }
 
 function failCreate(error: string): never {
@@ -64,8 +69,7 @@ export async function createEventAction(formData: FormData) {
   const isNetworking = formData.get("isNetworking") === "on";
   const isPaid = formData.get("isPaid") === "on";
   const price = Number(formData.get("price") || 0);
-  const paymentInstructions =
-    String(formData.get("paymentInstructions") || "").trim() || null;
+  const paymentInstructions = parsePaymentInstructions(formData);
   const currency = isPaid ? parseCurrencyFromForm(formData) : "hkd";
   const capacity = parseCapacityFromForm(formData);
   const maxPerOrder = Math.max(1, Math.floor(Number(formData.get("maxPerOrder") || 1)));
@@ -84,11 +88,6 @@ export async function createEventAction(formData: FormData) {
   const slugRaw = String(formData.get("slug") || "").trim();
   const slug = slugRaw ? await resolveCustomSlug(slugRaw) : await allocateEventSlug(title);
   if (!slug) failCreate("slug");
-
-  const paymentImage = formData.get("paymentImage") as File | null;
-  const paymentImagePath = isPaid
-    ? await storeImageFromForm(paymentImage, "pay-images")
-    : null;
 
   let event;
   try {
@@ -109,7 +108,6 @@ export async function createEventAction(formData: FormData) {
         maxPerOrder,
         allowOfflinePayment: isPaid,
         paymentInstructions: isPaid ? paymentInstructions : null,
-        paymentImagePath,
         themeId: parseThemeId(formData) ?? null,
         contactDetails: parseContactDetails(formData),
         organizerId: user.id,
@@ -134,8 +132,6 @@ export async function updateEventAction(formData: FormData) {
 
   const isPaid = formData.get("isPaid") === "on";
   const description = parseDescription(formData, event.description);
-  const paymentImage = formData.get("paymentImage") as File | null;
-  const uploaded = isPaid ? await storeImageFromForm(paymentImage, "pay-images") : null;
   const priceCents = isPaid ? Math.round(Number(formData.get("price") || 0) * 100) : 0;
 
   const slugRaw = String(formData.get("slug") || "").trim();
@@ -174,9 +170,8 @@ export async function updateEventAction(formData: FormData) {
           ? parseContactDetails(formData)
           : event.contactDetails,
         paymentInstructions: isPaid
-          ? String(formData.get("paymentInstructions") || "").trim() || null
+          ? parsePaymentInstructions(formData, event.paymentInstructions ?? "")
           : event.paymentInstructions,
-        ...(uploaded ? { paymentImagePath: uploaded } : {}),
       },
     });
   } catch (error) {
