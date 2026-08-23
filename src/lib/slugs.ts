@@ -1,8 +1,5 @@
 import { prisma } from "@/lib/prisma";
-
-function appOrigin() {
-  return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
-}
+import { appOrigin } from "@/lib/app-url";
 
 export const SLUG_MAX = 48;
 const RESERVED_SLUGS = new Set(["new", "api"]);
