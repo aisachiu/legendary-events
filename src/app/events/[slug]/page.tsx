@@ -146,8 +146,8 @@ export default async function EventPage({
               <>
                 <p className="text-sm text-[var(--mute)]">
                   Sign in or create an account here, then you can{" "}
-                  {full ? "join the waitlist" : "hold a place"}. Enter your email first — we&apos;ll
-                  ask for a password (and your name if you&apos;re new).
+                  {full ? "join the waitlist" : "hold a place"}. Use Google or a magic link by email
+                  or text — we&apos;ll ask for your name if you&apos;re new.
                 </p>
                 {process.env.NEXT_PUBLIC_DESCOPE_PROJECT_ID ? (
                   <AuthForm next={`/events/${slug}`} variant="compact" />

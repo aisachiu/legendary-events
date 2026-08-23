@@ -26,23 +26,6 @@ export async function sessionJwtAction() {
   return sess?.jwt ?? null;
 }
 
-/** Email-first auth: returning users already have a Descope-linked row. */
-export async function lookupEmailAction(emailRaw: string) {
-  const email = emailRaw.trim().toLowerCase();
-  if (!emailOk(email)) {
-    return { ok: false as const, error: "Enter a valid email." };
-  }
-  const user = await prisma.user.findUnique({
-    where: { email },
-    select: { descopeUserId: true },
-  });
-  return {
-    ok: true as const,
-    email,
-    exists: Boolean(user?.descopeUserId),
-  };
-}
-
 export async function syncDescopeUserAction(input: {
   name?: string;
   email?: string;
@@ -59,11 +42,11 @@ export async function syncDescopeUserAction(input: {
       token = sess?.token as Record<string, unknown> | undefined;
     }
   } catch {
-    return { ok: false as const, error: "Sign-in did not finish. Try the code again." };
+    return { ok: false as const, error: "Sign-in did not finish. Request a new magic link." };
   }
   const descopeUserId = claimString(token ?? {}, "sub");
   if (!descopeUserId) {
-    return { ok: false as const, error: "Sign-in did not finish. Try the code again." };
+    return { ok: false as const, error: "Sign-in did not finish. Request a new magic link." };
   }
 
   const emailRaw = (input.email || claimString(token!, "email") || "").trim().toLowerCase();

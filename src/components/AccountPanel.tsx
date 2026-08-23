@@ -2,9 +2,9 @@
 
 import { useDescope, useSession, useUser } from "@descope/nextjs-sdk/client";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { sessionJwtAction, updateNameAction } from "@/app/actions/auth";
-import { errText, toE164, urlFromResp } from "@/lib/descope-client";
+import { useEffect, useRef, useState } from "react";
+import { sessionJwtAction, syncDescopeUserAction, updateNameAction } from "@/app/actions/auth";
+import { errText, jwtFromResp, toE164, urlFromResp } from "@/lib/descope-client";
 
 type DescopeUser = {
   email?: string;
@@ -43,18 +43,49 @@ export function AccountPanel({
   const { sessionToken } = useSession();
   const router = useRouter();
   const descopeUser = user as DescopeUser | undefined;
+  const verifying = useRef(false);
 
   const [displayName, setDisplayName] = useState(name);
   const [phone, setPhone] = useState("");
-  const [smsCode, setSmsCode] = useState("");
-  const [smsSent, setSmsSent] = useState(false);
+  const [phoneSent, setPhoneSent] = useState(false);
   const [email, setEmail] = useState("");
-  const [emailCode, setEmailCode] = useState("");
   const [emailSent, setEmailSent] = useState(false);
-  const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (verifying.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("t") || params.get("token");
+    if (!token) return;
+    verifying.current = true;
+    void (async () => {
+      setBusy(true);
+      try {
+        const resp = await sdk.magicLink.verify(token);
+        if (!resp.ok) {
+          setError(errText(resp) || "That link is invalid or has expired. Request a new one.");
+          return;
+        }
+        const synced = await syncDescopeUserAction({ sessionJwt: jwtFromResp(resp) });
+        if (!synced.ok) {
+          setError(synced.error);
+          return;
+        }
+        setMessage("Sign-in method updated.");
+        setEmailSent(false);
+        setPhoneSent(false);
+        router.replace("/account");
+        router.refresh();
+      } catch (e) {
+        setError(errText(e));
+      } finally {
+        setBusy(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -128,7 +159,7 @@ export function AccountPanel({
     }
   }
 
-  async function sendPhoneCode() {
+  async function sendPhoneLink() {
     setError("");
     const e164 = toE164(phone);
     const id = loginIdOf(descopeUser);
@@ -143,13 +174,15 @@ export function AccountPanel({
     setBusy(true);
     try {
       const jwt = await token();
-      const resp = await sdk.otp.update.phone.sms(id, e164, jwt || undefined);
+      const redirect = `${window.location.origin}/account`;
+      const resp = await sdk.magicLink.update.phone.sms(id, e164, redirect, jwt || undefined);
       if (!resp.ok) {
-        setError(errText(resp) || "Could not send the SMS.");
+        setError(errText(resp) || "Could not send the SMS link.");
         return;
       }
-      setSmsSent(true);
-      setMessage("We texted a code.");
+      setPhone(e164);
+      setPhoneSent(true);
+      setMessage("We texted a link to confirm this number.");
     } catch (e) {
       setError(errText(e));
     } finally {
@@ -157,27 +190,7 @@ export function AccountPanel({
     }
   }
 
-  async function verifyPhone() {
-    setError("");
-    setBusy(true);
-    try {
-      const e164 = toE164(phone);
-      const resp = await sdk.otp.verify.sms(e164, smsCode.trim());
-      if (!resp.ok) {
-        setError(errText(resp) || "That code did not work.");
-        return;
-      }
-      setMessage("Phone is linked.");
-      setSmsSent(false);
-      router.refresh();
-    } catch (e) {
-      setError(errText(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function sendEmailCode() {
+  async function sendEmailLink() {
     setError("");
     const id = loginIdOf(descopeUser);
     const addr = email.trim().toLowerCase();
@@ -188,64 +201,15 @@ export function AccountPanel({
     setBusy(true);
     try {
       const jwt = await token();
-      const resp = await sdk.otp.update.email(id, addr, jwt || undefined);
+      const redirect = `${window.location.origin}/account`;
+      const resp = await sdk.magicLink.update.email(id, addr, redirect, jwt || undefined);
       if (!resp.ok) {
-        setError(errText(resp) || "Could not send the email code.");
+        setError(errText(resp) || "Could not send the email link.");
         return;
       }
+      setEmail(addr);
       setEmailSent(true);
-      setMessage("We emailed a code.");
-    } catch (e) {
-      setError(errText(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function verifyEmail() {
-    setError("");
-    setBusy(true);
-    try {
-      const addr = email.trim().toLowerCase();
-      const resp = await sdk.otp.verify.email(addr, emailCode.trim());
-      if (!resp.ok) {
-        setError(errText(resp) || "That code did not work.");
-        return;
-      }
-      setMessage("Email is linked.");
-      setEmailSent(false);
-      router.refresh();
-    } catch (e) {
-      setError(errText(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function savePassword() {
-    setError("");
-    const id = descopeUser?.email || loginIdOf(descopeUser);
-    if (!isRealEmail(id)) {
-      setError("Link a real email before setting a password.");
-      return;
-    }
-    if (password.length < 8) {
-      setError("Use at least 8 characters.");
-      return;
-    }
-    setBusy(true);
-    try {
-      const jwt = await token();
-      const updated = await sdk.password.update(id, password, jwt || undefined);
-      const created = updated.ok
-        ? updated
-        : await sdk.password.signUp(id, password, { email: id });
-      if (!created.ok) {
-        setError(errText(created) || "Could not set the password.");
-        return;
-      }
-      setPassword("");
-      setMessage("Password saved.");
+      setMessage("We emailed a link to confirm this address.");
     } catch (e) {
       setError(errText(e));
     } finally {
@@ -319,73 +283,52 @@ export function AccountPanel({
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
         />
-        {smsSent ? (
+        {phoneSent ? (
           <>
-            <input
-              className="field"
-              inputMode="numeric"
-              placeholder="SMS code"
-              value={smsCode}
-              onChange={(e) => setSmsCode(e.target.value)}
-            />
-            <button className="btn-gold" type="button" disabled={busy} onClick={verifyPhone}>
-              Verify phone
+            <p className="text-sm text-[var(--mute)]">
+              Open the link we texted to <span className="text-[var(--ink)]">{phone}</span>.
+            </p>
+            <button className="btn-gold" type="button" disabled={busy} onClick={sendPhoneLink}>
+              Resend SMS link
             </button>
           </>
         ) : (
-          <button className="btn-line" type="button" disabled={busy} onClick={sendPhoneCode}>
+          <button className="btn-line" type="button" disabled={busy} onClick={sendPhoneLink}>
             {phoneOn ? "Change phone" : "Link phone"}
           </button>
         )}
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-serif text-2xl">Email and password</h2>
+        <h2 className="font-serif text-2xl">Email</h2>
         {emailOn ? (
           <p className="text-sm text-[var(--mute)]">{descopeUser?.email}</p>
         ) : (
-          <>
-            <p className="text-sm text-[var(--mute)]">Link an email before setting a password.</p>
-            <input
-              className="field"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            {emailSent ? (
-              <>
-                <input
-                  className="field"
-                  placeholder="Email code"
-                  value={emailCode}
-                  onChange={(e) => setEmailCode(e.target.value)}
-                />
-                <button className="btn-gold" type="button" disabled={busy} onClick={verifyEmail}>
-                  Verify email
-                </button>
-              </>
-            ) : (
-              <button className="btn-line" type="button" disabled={busy} onClick={sendEmailCode}>
-                Link email
-              </button>
-            )}
-          </>
+          <p className="text-sm text-[var(--mute)]">
+            Link an email so you can sign in with a magic link.
+          </p>
         )}
-        {emailOn ? (
+        <input
+          className="field"
+          type="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        {emailSent ? (
           <>
-            <label className="label">New password</label>
-            <input
-              className="field"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <button className="btn-gold" type="button" disabled={busy} onClick={savePassword}>
-              Save password
+            <p className="text-sm text-[var(--mute)]">
+              Open the link we emailed to <span className="text-[var(--ink)]">{email}</span>.
+            </p>
+            <button className="btn-gold" type="button" disabled={busy} onClick={sendEmailLink}>
+              Resend email link
             </button>
           </>
-        ) : null}
+        ) : (
+          <button className="btn-line" type="button" disabled={busy} onClick={sendEmailLink}>
+            {emailOn ? "Change email" : "Link email"}
+          </button>
+        )}
       </section>
     </div>
   );

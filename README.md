@@ -17,7 +17,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-Sign-in is **Google, email + password, or SMS OTP** via [Descope](https://app.descope.com) on one form (new users use the same page). Enable **Password**, **OTP (SMS)**, and **Google**. For forgotten passwords, under **Authentication → Passwords**, set reset method to **Magic Link** and add redirect URLs: `http://localhost:3000/reset-password` and `https://hklegends-events.vercel.app/reset-password` (plus `/login` and `/account`).
+Sign-in is **Google or magic links (email / SMS)** via [Descope](https://app.descope.com) on one form (new users use the same page). Enable **Magic Link** for email and SMS, plus **Google**. Add redirect URLs: `http://localhost:3000/login`, `http://localhost:3000/account`, and the same paths on Vercel (`https://hklegends-events.vercel.app/...`).
 
 Anyone signed in can create events. Superadmin is still `/admin` (`SUPERADMIN_EMAIL` on first login to that inbox). Phone-only users get a placeholder email until they link a real one on **Account**.
 

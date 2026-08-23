@@ -16,10 +16,6 @@ function asErr(err: unknown): DescopeErr | null {
   return null;
 }
 
-export function errorCode(err: unknown) {
-  return asErr(err)?.errorCode || "";
-}
-
 export function errText(err: unknown) {
   if (!err) return "Something went wrong.";
   if (typeof err === "string") return err;
@@ -35,44 +31,6 @@ export function errText(err: unknown) {
   return "Something went wrong.";
 }
 
-function haystack(err: unknown) {
-  const nested = asErr(err);
-  return [
-    errorCode(err),
-    nested?.errorDescription,
-    nested?.errorMessage,
-    nested?.message,
-    errText(err),
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-}
-
-/** Descope E062108 — or message text when the code is missing. */
-export function isUserNotFound(err: unknown) {
-  const code = errorCode(err);
-  if (code === "E062108") return true;
-  const t = haystack(err);
-  return (
-    t.includes("not found") ||
-    t.includes("does not exist") ||
-    t.includes("does not exists") ||
-    t.includes("no user") ||
-    t.includes("user not") ||
-    t.includes("couldn't find") ||
-    t.includes("could not find")
-  );
-}
-
-/** Descope E062107 — sign-up when the login id already exists. */
-export function isUserAlreadyExists(err: unknown) {
-  const code = errorCode(err);
-  if (code === "E062107") return true;
-  const t = haystack(err);
-  return t.includes("already exists") || t.includes("user already");
-}
-
 export function toE164(raw: string) {
   const digits = raw.replace(/[^\d+]/g, "");
   if (digits.startsWith("+")) return digits;
@@ -85,19 +43,6 @@ export function jwtFromResp(resp: { data?: unknown }) {
     return String((resp.data as { sessionJwt?: string }).sessionJwt || "") || undefined;
   }
   return undefined;
-}
-
-export function refreshJwtFromResp(resp: { data?: unknown }) {
-  if (resp.data && typeof resp.data === "object" && "refreshJwt" in resp.data) {
-    return String((resp.data as { refreshJwt?: string }).refreshJwt || "") || undefined;
-  }
-  return undefined;
-}
-
-export function loginIdFromResp(resp: { data?: unknown }) {
-  if (!resp.data || typeof resp.data !== "object" || !("user" in resp.data)) return "";
-  const user = (resp.data as { user?: { email?: string; loginIds?: string[] } }).user;
-  return user?.loginIds?.[0] || user?.email || "";
 }
 
 export function urlFromResp(resp: { data?: unknown }) {

@@ -16,8 +16,8 @@ export default async function AccountPage({
       <h1 className="font-serif text-4xl">{welcome === "1" ? "One more thing" : "Account"}</h1>
       {welcome === "1" ? null : (
         <p className="mt-3 text-sm text-[var(--mute)]">
-          Your name shows on sign-out and on events you host. Link Google, a phone, or email so
-          you can sign in however you like.
+          Your name shows on sign-out and on events you host. Link Google, a phone, or email — phone
+          and email use magic links.
         </p>
       )}
       <AccountPanel name={user.name} welcome={welcome === "1"} next={next || "/"} />

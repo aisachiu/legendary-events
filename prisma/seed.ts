@@ -117,7 +117,7 @@ async function main() {
   });
 
   console.log(
-    "Seeded host@ / guest@ / admin@legendary.events. They sign in with a Descope email or WhatsApp OTP to those emails.",
+    "Seeded host@ / guest@ / admin@legendary.events. They sign in with Descope (Google or magic link to those emails).",
   );
 }
 
