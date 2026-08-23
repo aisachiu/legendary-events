@@ -1,3 +1,5 @@
+import { appUrl as resolvedAppUrl } from "@/lib/app-url";
+
 export function formatMoney(cents: number, currency = "usd") {
   const code = currency.toUpperCase();
   try {
@@ -21,7 +23,7 @@ export function formatWhen(date: Date) {
 }
 
 export function appUrl() {
-  return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  return resolvedAppUrl();
 }
 
 export function toDatetimeLocal(date: Date) {
