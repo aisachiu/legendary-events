@@ -17,8 +17,10 @@ import { getCurrentUser } from "@/lib/auth";
 import { formatMoney, formatWhen, toDatetimeLocal } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { isSuperadmin } from "@/lib/roles";
+import { publicEventUrl } from "@/lib/slugs";
+import { DEFAULT_SITE_THEME, themeList } from "@/lib/themes";
+import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { StatusPills } from "@/components/Pills";
-import { themeList } from "@/lib/themes";
 
 export default async function AdminPage({
   searchParams,
@@ -67,6 +69,11 @@ export default async function AdminPage({
       {error === "user-exists" || error === "user-create" ? (
         <p className="mt-4 text-sm text-red-800">Could not create that user. Check the email.</p>
       ) : null}
+      {error === "slug" ? (
+        <p className="mt-4 text-sm text-red-800">
+          That event link is already used, or isn&apos;t valid. Use letters, numbers, and hyphens.
+        </p>
+      ) : null}
 
       <section className="mt-12">
         <h2 className="font-serif text-3xl">Site theme</h2>
@@ -76,7 +83,7 @@ export default async function AdminPage({
             <select
               className="field min-w-48"
               name="siteThemeId"
-              defaultValue={siteSettings?.siteThemeId ?? "wisdom-bamboo"}
+              defaultValue={siteSettings?.siteThemeId ?? DEFAULT_SITE_THEME}
             >
               {themeList.map((theme) => (
                 <option key={theme.id} value={theme.id}>
@@ -168,12 +175,20 @@ export default async function AdminPage({
               <p className="text-sm text-[var(--mute)]">
                 Host {event.organizer.name} ({event.organizer.email}) · {formatWhen(event.startsAt)}
               </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <code className="max-w-full truncate text-xs">{publicEventUrl(event.slug)}</code>
+                <CopyLinkButton url={publicEventUrl(event.slug)} label="Copy public link" />
+              </div>
               <form action={updateEventAction} className="mt-4 grid gap-3 sm:grid-cols-2">
                 <input type="hidden" name="id" value={event.id} />
                 <input type="hidden" name="next" value="/admin" />
                 <div className="sm:col-span-2">
                   <label className="label">Title</label>
                   <input className="field" name="title" defaultValue={event.title} />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="label">Link slug</label>
+                  <input className="field font-mono text-sm" name="slug" defaultValue={event.slug} />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="label">Description</label>
@@ -268,6 +283,26 @@ export default async function AdminPage({
                     name="paymentInstructions"
                     defaultValue={event.paymentInstructions ?? ""}
                   />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="label">Participant contact details</label>
+                  <textarea
+                    className="field min-h-20"
+                    name="contactDetails"
+                    defaultValue={event.contactDetails ?? ""}
+                    placeholder="Phone, email, or other support details"
+                  />
+                </div>
+                <div>
+                  <label className="label">Theme</label>
+                  <select className="field" name="themeId" defaultValue={event.themeId ?? "inherit"}>
+                    <option value="inherit">Site default</option>
+                    {themeList.map((theme) => (
+                      <option key={theme.id} value={theme.id}>
+                        {theme.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <button className="btn-gold w-fit" type="submit">
                   Save event

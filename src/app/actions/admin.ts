@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { bookingStatusFromSpots } from "@/lib/registrations";
 import { isSuperadmin } from "@/lib/roles";
+import { DEFAULT_SITE_THEME, isThemeId } from "@/lib/themes";
 
 const ROLES = new Set(["ATTENDEE", "ORGANIZER", "SUPERADMIN"]);
 const REG_STATUSES = new Set(["PENDING_PAYMENT", "CONFIRMED", "WAITLISTED", "CANCELLED"]);
@@ -161,7 +162,8 @@ export async function updatePaymentAdminAction(formData: FormData) {
 
 export async function updateSiteSettingsAction(formData: FormData) {
   await requireSuperadmin();
-  const siteThemeId = String(formData.get("siteThemeId") || "wisdom-bamboo");
+  const raw = String(formData.get("siteThemeId") || "");
+  const siteThemeId = isThemeId(raw) ? raw : DEFAULT_SITE_THEME;
   await prisma.siteSettings.upsert({
     where: { id: "default" },
     update: { siteThemeId },

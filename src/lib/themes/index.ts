@@ -1,4 +1,4 @@
-export type ThemeId = "wisdom-bamboo" | "classic-paper";
+export type ThemeId = "future-fusion" | "wisdom-bamboo" | "classic-paper";
 
 export type ThemeDefinition = {
   id: ThemeId;
@@ -7,9 +7,28 @@ export type ThemeDefinition = {
   cssVars: Record<string, string>;
 };
 
-export const DEFAULT_SITE_THEME: ThemeId = "wisdom-bamboo";
+export const DEFAULT_SITE_THEME: ThemeId = "future-fusion";
 
 export const themes: Record<ThemeId, ThemeDefinition> = {
+  "future-fusion": {
+    id: "future-fusion",
+    name: "Future Fusion",
+    description: "Electric blue, cyber green, graphite, and white.",
+    cssVars: {
+      "--paper": "#f4f7fb",
+      "--ink": "#1b1f24",
+      "--mute": "#5b6570",
+      "--line": "#d5dde6",
+      "--accent": "#0a84ff",
+      "--accent-deep": "#0055d4",
+      "--accent-ink": "#003a9e",
+      "--accent-soft": "#d6e9ff",
+      "--gold": "#0a84ff",
+      "--gold-ink": "#003a9e",
+      "--gold-soft": "#d6e9ff",
+      "--cyber": "#12c48b",
+    },
+  },
   "wisdom-bamboo": {
     id: "wisdom-bamboo",
     name: "Wisdom & Bamboo",
@@ -51,7 +70,7 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
 export const themeList = Object.values(themes);
 
 export function isThemeId(value: string | null | undefined): value is ThemeId {
-  return value === "wisdom-bamboo" || value === "classic-paper";
+  return Boolean(value && value in themes);
 }
 
 export function resolveThemeId(value: string | null | undefined): ThemeId {

@@ -1,12 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { DescriptionEditor } from "@/components/DescriptionEditor";
 import { CURRENCY_PRESETS, currencyPresetValue } from "@/lib/currency";
+import { previewEventPath, publicEventUrl } from "@/lib/slugs";
 import { themeList } from "@/lib/themes";
 
 export type EventFormValues = {
   id?: string;
+  slug?: string;
   title?: string;
   description?: string;
   venue?: string;
@@ -22,7 +25,15 @@ export type EventFormValues = {
   paymentInstructions?: string | null;
   paymentImageSrc?: string | null;
   themeId?: string | null;
+  contactDetails?: string | null;
 };
+
+function formErrorMessage(error?: string) {
+  if (error === "price") return "Paid events need a price of at least 1.00.";
+  if (error === "slug") return "That link is already used, or is not valid. Use letters, numbers, and hyphens.";
+  if (error) return "Fill title, description, venue, and start time.";
+  return null;
+}
 
 export function EventForm({
   action,
@@ -41,12 +52,17 @@ export function EventForm({
 }) {
   const [isPaid, setIsPaid] = useState(Boolean(values?.isPaid));
   const [limitCapacity, setLimitCapacity] = useState(Boolean(values?.capacity));
+  const [title, setTitle] = useState(values?.title ?? "");
+  const [slug, setSlug] = useState(values?.slug ?? "");
   const initialPreset = currencyPresetValue(values?.currency ?? "hkd");
   const [currencyPreset, setCurrencyPreset] = useState(initialPreset);
   const otherDefault = useMemo(() => {
     const code = (values?.currency ?? "").toUpperCase();
     return initialPreset === "OTHER" ? code : "";
   }, [values?.currency, initialPreset]);
+  const previewSlug = previewEventPath(title, slug);
+  const savedUrl = values?.slug ? publicEventUrl(values.slug) : null;
+  const errorMessage = formErrorMessage(error);
 
   return (
     <form action={action} className="grid gap-4">
@@ -56,17 +72,39 @@ export function EventForm({
             <input key={key} type="hidden" name={key} value={value} />
           ))
         : null}
-      {error ? (
-        <p className="text-sm text-red-800">
-          {error === "price"
-            ? "Paid events need a price of at least 1.00."
-            : "Fill title, description, venue, and start time."}
-        </p>
-      ) : null}
+      {errorMessage ? <p className="text-sm text-red-800">{errorMessage}</p> : null}
 
       <div>
         <label className="label">Title</label>
-        <input className="field" name="title" required defaultValue={values?.title} />
+        <input
+          className="field"
+          name="title"
+          required
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+      </div>
+
+      <div>
+        <label className="label">Link slug</label>
+        <input
+          className="field font-mono text-sm"
+          name="slug"
+          value={slug}
+          onChange={(e) => setSlug(e.target.value)}
+          placeholder="auto from title"
+          autoComplete="off"
+        />
+        <p className="mt-1 text-xs text-[var(--mute)]">
+          Public page: /events/{previewSlug}
+          {slug ? "" : " — leave blank to generate from the title."}
+        </p>
+        {savedUrl ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <code className="max-w-full truncate text-xs text-[var(--ink)]">{savedUrl}</code>
+            <CopyLinkButton url={savedUrl} />
+          </div>
+        ) : null}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -99,6 +137,20 @@ export function EventForm({
       <div>
         <label className="label">Description</label>
         <DescriptionEditor name="description" defaultValue={values?.description} />
+      </div>
+
+      <div>
+        <label className="label">Participant contact details</label>
+        <textarea
+          className="field min-h-24"
+          name="contactDetails"
+          defaultValue={values?.contactDetails ?? ""}
+          placeholder="Phone, email, or other support details"
+        />
+        <p className="mt-1 text-xs text-[var(--mute)]">
+          Leave a phone number and/or email address or support details here for signed-up
+          participants to contact. Only those who have registered can see it.
+        </p>
       </div>
 
       <label className="flex items-center gap-2 text-sm">

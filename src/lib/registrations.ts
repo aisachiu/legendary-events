@@ -1,3 +1,5 @@
+import { canManageEvent } from "@/lib/roles";
+
 export const OCCUPYING_STATUSES = ["CONFIRMED", "PENDING_PAYMENT"] as const;
 export const HELD_STATUSES = ["CONFIRMED", "PENDING_PAYMENT", "WAITLISTED"] as const;
 
@@ -29,6 +31,16 @@ export function eventIsFull(occupying: number, capacity: number | null) {
 export function remainingSeats(capacity: number | null, occupyingOthers: number) {
   if (capacity == null) return Infinity;
   return Math.max(0, capacity - occupyingOthers);
+}
+
+export function canSeeEventContact(
+  user: { id: string; role: string } | null,
+  event: { organizerId: string; contactDetails: string | null },
+  registration: { status: string } | null,
+) {
+  if (!event.contactDetails?.trim()) return false;
+  if (canManageEvent(user, event.organizerId)) return true;
+  return Boolean(registration && registration.status !== "CANCELLED");
 }
 
 export function bookingStatusFromSpots(spots: { status: string }[]) {
