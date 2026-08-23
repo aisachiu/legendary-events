@@ -1,26 +1,93 @@
+type DescopeErr = {
+  errorCode?: string;
+  errorDescription?: string;
+  errorMessage?: string;
+  message?: string;
+};
+
+function asErr(err: unknown): DescopeErr | null {
+  if (!err || typeof err !== "object") return null;
+  if ("errorCode" in err || "errorDescription" in err || "errorMessage" in err) {
+    return err as DescopeErr;
+  }
+  if ("error" in err && (err as { error?: unknown }).error && typeof (err as { error: unknown }).error === "object") {
+    return (err as { error: DescopeErr }).error;
+  }
+  return null;
+}
+
+export function errorCode(err: unknown) {
+  return asErr(err)?.errorCode || "";
+}
+
 export function errText(err: unknown) {
   if (!err) return "Something went wrong.";
   if (typeof err === "string") return err;
-  if (typeof err === "object" && "errorMessage" in err) {
-    return String((err as { errorMessage?: string }).errorMessage);
-  }
-  if (typeof err === "object" && "error" in err) {
-    const nested = (err as { error?: { errorMessage?: string; message?: string } }).error;
-    return nested?.errorMessage || nested?.message || "Something went wrong.";
+  const nested = asErr(err);
+  if (nested) {
+    return (
+      nested.errorMessage ||
+      nested.errorDescription ||
+      nested.message ||
+      "Something went wrong."
+    );
   }
   return "Something went wrong.";
 }
 
+function haystack(err: unknown) {
+  const nested = asErr(err);
+  return [
+    errorCode(err),
+    nested?.errorDescription,
+    nested?.errorMessage,
+    nested?.message,
+    errText(err),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+/** Descope E062108 — or message text when the code is missing. */
 export function isUserNotFound(err: unknown) {
-  const t = errText(err).toLowerCase();
+  const code = errorCode(err);
+  if (code === "E062108") return true;
+  const t = haystack(err);
   return (
     t.includes("not found") ||
     t.includes("does not exist") ||
+    t.includes("does not exists") ||
     t.includes("no user") ||
     t.includes("user not") ||
     t.includes("couldn't find") ||
     t.includes("could not find")
   );
+}
+
+/**
+ * Password sign-in for an unknown login id often returns invalid credentials
+ * (E062901 / E062903) instead of user-not-found, so we can safely try sign-up.
+ */
+export function shouldTryPasswordSignUp(err: unknown) {
+  const code = errorCode(err);
+  if (code === "E062108" || code === "E062901" || code === "E062903") return true;
+  if (isUserNotFound(err)) return true;
+  const t = haystack(err);
+  return (
+    t.includes("invalid signin credentials") ||
+    t.includes("invalid credentials") ||
+    t.includes("password signin failed") ||
+    t.includes("wrong password")
+  );
+}
+
+/** Descope E062107 — sign-up when the login id already exists. */
+export function isUserAlreadyExists(err: unknown) {
+  const code = errorCode(err);
+  if (code === "E062107") return true;
+  const t = haystack(err);
+  return t.includes("already exists") || t.includes("user already");
 }
 
 export function toE164(raw: string) {

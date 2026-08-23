@@ -6,8 +6,9 @@ import { useEffect, useRef, useState } from "react";
 import { syncDescopeUserAction } from "@/app/actions/auth";
 import {
   errText,
-  isUserNotFound,
+  isUserAlreadyExists,
   jwtFromResp,
+  shouldTryPasswordSignUp,
   toE164,
   urlFromResp,
 } from "@/lib/descope-client";
@@ -115,15 +116,30 @@ export function AuthForm({
   async function continueWithPassword() {
     setError("");
     const loginId = email.trim().toLowerCase();
-    if (!loginId.includes("@") || password.length < 6) {
+    if (!loginId.includes("@")) {
       setError("Enter your email and password.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Use at least 8 characters for your password.");
       return;
     }
     setBusy(true);
     try {
+      // Descope has no password.signUpOrIn. Unknown emails usually fail sign-in
+      // with invalid credentials (not "user not found"), so we fall back to sign-up.
       let resp = await sdk.password.signIn(loginId, password);
-      if (!resp.ok && isUserNotFound(resp)) {
-        resp = await sdk.password.signUp(loginId, password, { email: loginId });
+      if (!resp.ok && shouldTryPasswordSignUp(resp)) {
+        const created = await sdk.password.signUp(loginId, password, { email: loginId });
+        if (created.ok) {
+          resp = created;
+        } else if (isUserAlreadyExists(created)) {
+          // Account exists; the password was wrong.
+          setError("Email or password did not work.");
+          return;
+        } else {
+          resp = created;
+        }
       }
       if (!resp.ok) {
         setError(errText(resp) || "Email or password did not work.");
