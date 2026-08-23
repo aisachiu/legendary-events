@@ -65,23 +65,6 @@ export function isUserNotFound(err: unknown) {
   );
 }
 
-/**
- * Password sign-in for an unknown login id often returns invalid credentials
- * (E062901 / E062903) instead of user-not-found, so we can safely try sign-up.
- */
-export function shouldTryPasswordSignUp(err: unknown) {
-  const code = errorCode(err);
-  if (code === "E062108" || code === "E062901" || code === "E062903") return true;
-  if (isUserNotFound(err)) return true;
-  const t = haystack(err);
-  return (
-    t.includes("invalid signin credentials") ||
-    t.includes("invalid credentials") ||
-    t.includes("password signin failed") ||
-    t.includes("wrong password")
-  );
-}
-
 /** Descope E062107 — sign-up when the login id already exists. */
 export function isUserAlreadyExists(err: unknown) {
   const code = errorCode(err);

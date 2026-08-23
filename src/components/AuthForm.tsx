@@ -3,15 +3,17 @@
 import { useDescope, useSession } from "@descope/nextjs-sdk/client";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { syncDescopeUserAction } from "@/app/actions/auth";
+import { lookupEmailAction, syncDescopeUserAction } from "@/app/actions/auth";
 import {
   errText,
   isUserAlreadyExists,
+  isUserNotFound,
   jwtFromResp,
-  shouldTryPasswordSignUp,
   toE164,
   urlFromResp,
 } from "@/lib/descope-client";
+
+type EmailStep = "email" | "login" | "signup";
 
 function finishPath(next: string) {
   return next || "/";
@@ -35,7 +37,9 @@ export function AuthForm({
   const { isAuthenticated, isSessionLoading } = useSession();
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
+  const [emailStep, setEmailStep] = useState<EmailStep>("email");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
@@ -43,10 +47,14 @@ export function AuthForm({
   const [error, setError] = useState("");
   const finishing = useRef(false);
 
-  async function finish(sessionJwt?: string, extra?: { phone?: string; email?: string }) {
+  async function finish(
+    sessionJwt?: string,
+    extra?: { phone?: string; email?: string; name?: string },
+  ) {
     const synced = await syncDescopeUserAction({
       email: extra?.email,
       phone: extra?.phone,
+      name: extra?.name,
       sessionJwt,
     });
     if (!synced.ok) {
@@ -94,6 +102,13 @@ export function AuthForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, isSessionLoading]);
 
+  function resetEmailFlow() {
+    setEmailStep("email");
+    setPassword("");
+    setName("");
+    setError("");
+  }
+
   async function continueWithGoogle() {
     setError("");
     setBusy(true);
@@ -113,35 +128,73 @@ export function AuthForm({
     }
   }
 
-  async function continueWithPassword() {
+  async function continueWithEmail() {
     setError("");
     const loginId = email.trim().toLowerCase();
     if (!loginId.includes("@")) {
-      setError("Enter your email and password.");
-      return;
-    }
-    if (password.length < 8) {
-      setError("Use at least 8 characters for your password.");
+      setError("Enter your email.");
       return;
     }
     setBusy(true);
     try {
-      // Descope has no password.signUpOrIn. Unknown emails usually fail sign-in
-      // with invalid credentials (not "user not found"), so we fall back to sign-up.
-      let resp = await sdk.password.signIn(loginId, password);
-      if (!resp.ok && shouldTryPasswordSignUp(resp)) {
-        const created = await sdk.password.signUp(loginId, password, { email: loginId });
-        if (created.ok) {
-          resp = created;
-        } else if (isUserAlreadyExists(created)) {
-          // Account exists; the password was wrong.
-          setError("Email or password did not work.");
-          return;
-        } else {
-          resp = created;
-        }
+      const looked = await lookupEmailAction(loginId);
+      if (!looked.ok) {
+        setError(looked.error);
+        return;
       }
+      setEmail(looked.email);
+      setPassword("");
+      setName("");
+      setEmailStep(looked.exists ? "login" : "signup");
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitPassword() {
+    setError("");
+    const loginId = email.trim().toLowerCase();
+    if (password.length < 8) {
+      setError("Use at least 8 characters for your password.");
+      return;
+    }
+    if (emailStep === "signup" && name.trim().length < 2) {
+      setError("Enter the name we should use for you.");
+      return;
+    }
+    setBusy(true);
+    try {
+      if (emailStep === "signup") {
+        const displayName = name.trim();
+        const resp = await sdk.password.signUp(loginId, password, {
+          email: loginId,
+          name: displayName,
+        });
+        if (!resp.ok) {
+          if (isUserAlreadyExists(resp)) {
+            setEmailStep("login");
+            setPassword("");
+            setError("That email already has an account. Enter your password to sign in.");
+            return;
+          }
+          setError(errText(resp) || "Could not create your account.");
+          return;
+        }
+        finishing.current = true;
+        await finish(jwtFromResp(resp), { email: loginId, name: displayName });
+        return;
+      }
+
+      const resp = await sdk.password.signIn(loginId, password);
       if (!resp.ok) {
+        if (isUserNotFound(resp)) {
+          setEmailStep("signup");
+          setPassword("");
+          setError("No account for that email yet. Choose a password to sign up.");
+          return;
+        }
         setError(errText(resp) || "Email or password did not work.");
         return;
       }
@@ -208,29 +261,86 @@ export function AuthForm({
       </button>
 
       <div className="space-y-3">
-        <div>
-          <label className="label">Email</label>
-          <input
-            className="field"
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="label">Password</label>
-          <input
-            className="field"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
-        <button className="btn-gold w-full" type="button" disabled={busy} onClick={continueWithPassword}>
-          {busy ? "Working…" : "Continue with email"}
-        </button>
+        {emailStep === "email" ? (
+          <>
+            <div>
+              <label className="label">Email</label>
+              <input
+                className="field"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void continueWithEmail();
+                  }
+                }}
+              />
+            </div>
+            <button className="btn-gold w-full" type="button" disabled={busy} onClick={continueWithEmail}>
+              {busy ? "Checking…" : "Continue with email"}
+            </button>
+          </>
+        ) : (
+          <>
+            <div>
+              <label className="label">Email</label>
+              <div className="flex items-center gap-3">
+                <input className="field flex-1" type="email" value={email} readOnly />
+                <button
+                  className="shrink-0 text-sm underline text-[var(--mute)]"
+                  type="button"
+                  disabled={busy}
+                  onClick={resetEmailFlow}
+                >
+                  Change
+                </button>
+              </div>
+            </div>
+            {emailStep === "signup" ? (
+              <div>
+                <label className="label">Your name</label>
+                <input
+                  className="field"
+                  type="text"
+                  autoComplete="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+            ) : null}
+            <div>
+              <label className="label">Password</label>
+              <input
+                className="field"
+                type="password"
+                autoComplete={emailStep === "signup" ? "new-password" : "current-password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void submitPassword();
+                  }
+                }}
+              />
+            </div>
+            <button className="btn-gold w-full" type="button" disabled={busy} onClick={submitPassword}>
+              {busy
+                ? "Working…"
+                : emailStep === "signup"
+                  ? "Create account"
+                  : "Sign in"}
+            </button>
+            {emailStep === "login" ? (
+              <p className="text-xs text-[var(--mute)]">
+                Usually use Google? Continue with Google above instead.
+              </p>
+            ) : null}
+          </>
+        )}
       </div>
 
       <p className="text-center text-xs uppercase tracking-[0.2em] text-[var(--mute)]">or SMS</p>
