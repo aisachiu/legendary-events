@@ -87,6 +87,19 @@ export function jwtFromResp(resp: { data?: unknown }) {
   return undefined;
 }
 
+export function refreshJwtFromResp(resp: { data?: unknown }) {
+  if (resp.data && typeof resp.data === "object" && "refreshJwt" in resp.data) {
+    return String((resp.data as { refreshJwt?: string }).refreshJwt || "") || undefined;
+  }
+  return undefined;
+}
+
+export function loginIdFromResp(resp: { data?: unknown }) {
+  if (!resp.data || typeof resp.data !== "object" || !("user" in resp.data)) return "";
+  const user = (resp.data as { user?: { email?: string; loginIds?: string[] } }).user;
+  return user?.loginIds?.[0] || user?.email || "";
+}
+
 export function urlFromResp(resp: { data?: unknown }) {
   if (resp.data && typeof resp.data === "object" && "url" in resp.data) {
     return String((resp.data as { url?: string }).url || "");

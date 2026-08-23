@@ -2,6 +2,7 @@
 
 import { useDescope, useSession } from "@descope/nextjs-sdk/client";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { lookupEmailAction, syncDescopeUserAction } from "@/app/actions/auth";
 import {
@@ -12,6 +13,7 @@ import {
   toE164,
   urlFromResp,
 } from "@/lib/descope-client";
+import { forgotPasswordHref } from "@/lib/password-reset";
 
 type EmailStep = "email" | "login" | "signup";
 
@@ -336,6 +338,10 @@ export function AuthForm({
             </button>
             {emailStep === "login" ? (
               <p className="text-xs text-[var(--mute)]">
+                <Link className="underline" href={forgotPasswordHref(email, next)}>
+                  Forgot password?
+                </Link>
+                {" · "}
                 Usually use Google? Continue with Google above instead.
               </p>
             ) : null}
