@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { signupAction } from "@/app/actions/payments";
+import { AuthForm } from "@/components/AuthForm";
+import { EventContactBox } from "@/components/EventContactBox";
 import { EventHtml } from "@/components/EventHtml";
 import { PartyFields, QuotaNotice } from "@/components/PartyFields";
 import { Pill } from "@/components/Pills";
 import { getCurrentUser } from "@/lib/auth";
 import { formatMoney, formatWhen } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
-import { eventIsFull, formatSignupCount, occupyingSpotWhere } from "@/lib/registrations";
+import { canSeeEventContact, eventIsFull, formatSignupCount, occupyingSpotWhere } from "@/lib/registrations";
 
 export default async function EventPage({
   params,
@@ -67,6 +69,9 @@ export default async function EventPage({
           {formatSignupCount(occupying, event.capacity)}
         </p>
         <EventHtml html={event.description} />
+        {canSeeEventContact(user, event, mine) && event.contactDetails ? (
+          <EventContactBox details={event.contactDetails} />
+        ) : null}
         {event.isNetworking ? (
           <p className="mt-8 text-sm text-[var(--mute)]">
             Who&apos;s Going stays closed until your place is confirmed
@@ -132,60 +137,67 @@ export default async function EventPage({
             </Link>
           </div>
         ) : showSignup ? (
-          <form action={signupAction} className="space-y-3">
-            <input type="hidden" name="slug" value={slug} />
+          <div className="space-y-3">
             <p className="font-serif text-2xl">{full ? "Join waitlist" : "Sign up"}</p>
             {mine?.status === "CANCELLED" ? (
               <p className="text-sm text-[var(--mute)]">This signup was cancelled. You can join again.</p>
             ) : null}
             {!user ? (
-              <p className="text-sm text-[var(--mute)]">
-                <Link className="underline" href={`/login?next=/events/${slug}`}>
-                  Sign in
-                </Link>{" "}
-                first, then you can {full ? "join the waitlist" : "hold a place"}.
-              </p>
-            ) : (
-              <p className="text-sm text-[var(--mute)]">Signing up as {user.name}.</p>
-            )}
-            {user ? (
-              <PartyFields
-                maxPerOrder={event.maxPerOrder}
-                defaultHolder={user.name}
-                requireHolderName
-                showGoingOptIn={event.isNetworking}
-              />
-            ) : null}
-            {event.isNetworking ? (
               <>
-                <div>
-                  <label className="label">Title / position</label>
-                  <input className="field" name="titlePosition" />
-                </div>
-                <div>
-                  <label className="label">Intro / bio</label>
-                  <textarea
-                    className="field min-h-24"
-                    name="introBio"
-                    placeholder="Write a sentence or two to introduce yourself!"
-                  />
-                </div>
-                <div>
-                  <label className="label">LinkedIn URL</label>
-                  <input className="field" name="linkedinUrl" placeholder="https://" />
-                </div>
+                <p className="text-sm text-[var(--mute)]">
+                  Sign in or create an account here, then you can{" "}
+                  {full ? "join the waitlist" : "hold a place"}. New here? Same form — we&apos;ll
+                  create your account.
+                </p>
+                {process.env.NEXT_PUBLIC_DESCOPE_PROJECT_ID ? (
+                  <AuthForm next={`/events/${slug}`} variant="compact" />
+                ) : (
+                  <p className="text-sm text-red-800">
+                    Sign-in is not configured yet. Set{" "}
+                    <code>NEXT_PUBLIC_DESCOPE_PROJECT_ID</code> and restart.
+                  </p>
+                )}
               </>
-            ) : null}
-            {user ? (
-              <button className="btn-gold w-full" type="submit">
-                {full
-                  ? "Join waitlist"
-                  : event.isPaid
-                    ? "Hold my place"
-                    : "Confirm my place"}
-              </button>
-            ) : null}
-          </form>
+            ) : (
+              <form action={signupAction} className="space-y-3">
+                <input type="hidden" name="slug" value={slug} />
+                <p className="text-sm text-[var(--mute)]">Signing up as {user.name}.</p>
+                <PartyFields
+                  maxPerOrder={event.maxPerOrder}
+                  defaultHolder={user.name}
+                  requireHolderName
+                  showGoingOptIn={event.isNetworking}
+                />
+                {event.isNetworking ? (
+                  <>
+                    <div>
+                      <label className="label">Title / position</label>
+                      <input className="field" name="titlePosition" />
+                    </div>
+                    <div>
+                      <label className="label">Intro / bio</label>
+                      <textarea
+                        className="field min-h-24"
+                        name="introBio"
+                        placeholder="Write a sentence or two to introduce yourself!"
+                      />
+                    </div>
+                    <div>
+                      <label className="label">LinkedIn URL</label>
+                      <input className="field" name="linkedinUrl" placeholder="https://" />
+                    </div>
+                  </>
+                ) : null}
+                <button className="btn-gold w-full" type="submit">
+                  {full
+                    ? "Join waitlist"
+                    : event.isPaid
+                      ? "Hold my place"
+                      : "Confirm my place"}
+                </button>
+              </form>
+            )}
+          </div>
         ) : null}
       </aside>
     </div>

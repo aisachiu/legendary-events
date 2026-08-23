@@ -12,6 +12,7 @@ import {
   setGroupTotalAction,
   updateSpotAmountAction,
 } from "@/app/actions/payments";
+import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { EventForm } from "@/components/EventForm";
 import { StatusPills } from "@/components/Pills";
 import { getCurrentUser } from "@/lib/auth";
@@ -19,13 +20,17 @@ import { formatMoney, formatWhen, toDatetimeLocal } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { OCCUPYING_STATUSES } from "@/lib/registrations";
 import { canManageEvent } from "@/lib/roles";
+import { publicEventUrl } from "@/lib/slugs";
 
 export default async function EventDeskPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const { id } = await params;
+  const { error } = await searchParams;
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/dashboard");
 
@@ -76,20 +81,24 @@ export default async function EventDeskPage({
           <Link href={`/events/${event.slug}`} className="btn-line">
             Public page
           </Link>
+          <CopyLinkButton url={publicEventUrl(event.slug)} label="Copy public link" />
         </div>
       </div>
       <p className="mt-2 text-sm text-[var(--mute)]">
         {formatWhen(event.startsAt)} · {occupancyLabel}
         {waitlistSpots ? ` · ${waitlistSpots} waitlisted` : ""}
       </p>
+      <p className="mt-1 truncate font-mono text-xs text-[var(--mute)]">{publicEventUrl(event.slug)}</p>
 
       <div className="card mt-8 p-6">
         <EventForm
           action={updateEventAction}
           submitLabel="Save event"
           showPublished
+          error={error}
           values={{
             id: event.id,
+            slug: event.slug,
             title: event.title,
             description: event.description,
             venue: event.venue,
@@ -107,6 +116,7 @@ export default async function EventDeskPage({
               ? `/api/events/${event.slug}/pay-image`
               : null,
             themeId: event.themeId,
+            contactDetails: event.contactDetails,
           }}
         />
       </div>

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { cancelAttendanceAction, updatePartyAction } from "@/app/actions/payments";
+import { EventContactBox } from "@/components/EventContactBox";
 import { PartyFields, QuotaNotice } from "@/components/PartyFields";
 import { StatusPills } from "@/components/Pills";
 import { getCurrentUser } from "@/lib/auth";
 import { formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { canSeeEventContact } from "@/lib/registrations";
 
 export default async function ConfirmationPage({
   params,
@@ -92,6 +94,10 @@ export default async function ConfirmationPage({
           The host will open this once they match your upload. You will not see Who&apos;s
           Going until then.
         </p>
+      ) : null}
+
+      {canSeeEventContact(user, event, registration) && event.contactDetails ? (
+        <EventContactBox details={event.contactDetails} />
       ) : null}
 
       {registration.status !== "CANCELLED" && event.maxPerOrder > 0 ? (

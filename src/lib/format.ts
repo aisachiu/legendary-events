@@ -20,15 +20,6 @@ export function formatWhen(date: Date) {
   }).format(date);
 }
 
-export function slugify(input: string) {
-  const base = input
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
-    .slice(0, 48);
-  return `${base || "event"}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
 export function appUrl() {
   return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 }

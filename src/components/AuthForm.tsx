@@ -23,7 +23,13 @@ function afterAuth(next: string, needsName: boolean) {
   return finishPath(next);
 }
 
-export function AuthForm({ next = "/" }: { next?: string }) {
+export function AuthForm({
+  next = "/",
+  variant = "full",
+}: {
+  next?: string;
+  variant?: "full" | "compact";
+}) {
   const sdk = useDescope();
   const { isAuthenticated, isSessionLoading } = useSession();
   const router = useRouter();
@@ -178,7 +184,7 @@ export function AuthForm({ next = "/" }: { next?: string }) {
   }
 
   return (
-    <div className="mt-8 space-y-6">
+    <div className={variant === "compact" ? "space-y-4" : "mt-8 space-y-6"}>
       {error ? <p className="text-sm text-red-800">{error}</p> : null}
 
       <button className="btn-line w-full" type="button" disabled={busy} onClick={continueWithGoogle}>
