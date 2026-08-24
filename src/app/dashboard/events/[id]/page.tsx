@@ -61,7 +61,9 @@ export default async function EventDeskPage({
     r.spots.some((s) => (OCCUPYING_STATUSES as readonly string[]).includes(s.status)),
   );
   const waitlist = event.registrations.filter((r) => r.status === "WAITLISTED");
+  const cancelled = event.registrations.filter((r) => r.status === "CANCELLED");
   const waitlistSpots = waitlist.reduce((n, r) => n + r.spots.filter((s) => s.status === "WAITLISTED").length, 0);
+  const cancelledSpots = cancelled.reduce((n, r) => n + r.spots.length, 0);
   const occupancyLabel =
     event.capacity != null
       ? `${occupyingSpots.length} / ${event.capacity} participants (you can exceed quota)`
@@ -87,6 +89,7 @@ export default async function EventDeskPage({
       <p className="mt-2 text-sm text-[var(--mute)]">
         {formatWhen(event.startsAt)} · {occupancyLabel}
         {waitlistSpots ? ` · ${waitlistSpots} waitlisted` : ""}
+        {cancelledSpots ? ` · ${cancelledSpots} cancelled` : ""}
       </p>
       <p className="mt-1 truncate font-mono text-xs text-[var(--mute)]">{publicEventUrl(event.slug)}</p>
 
@@ -122,20 +125,27 @@ export default async function EventDeskPage({
       <p className="mt-1 text-sm text-[var(--mute)]">
         Grouped by the person who booked. Mark each name paid, or the whole group.
       </p>
-      <BookingList rows={occupying} waitlist={false} maxPerOrder={event.maxPerOrder} />
+      <BookingList rows={occupying} variant="participants" maxPerOrder={event.maxPerOrder} />
 
       <h2 className="mt-12 font-serif text-3xl">Waiting list</h2>
       <p className="mt-1 text-sm text-[var(--mute)]">
         Oldest first. Moving a group in does not have to respect the quota.
       </p>
-      <BookingList rows={waitlist} waitlist maxPerOrder={event.maxPerOrder} />
+      <BookingList rows={waitlist} variant="waitlist" maxPerOrder={event.maxPerOrder} />
+
+      <h2 className="mt-12 font-serif text-3xl">Cancelled participants</h2>
+      <p className="mt-1 text-sm text-[var(--mute)]">
+        People who cancelled their booking. Payment records stay here so you can mark receipts and
+        refunds.
+      </p>
+      <BookingList rows={cancelled} variant="cancelled" maxPerOrder={event.maxPerOrder} />
     </div>
   );
 }
 
 function BookingList({
   rows,
-  waitlist,
+  variant,
   maxPerOrder,
 }: {
   rows: {
@@ -159,21 +169,28 @@ function BookingList({
       } | null;
     }[];
   }[];
-  waitlist: boolean;
+  variant: "participants" | "waitlist" | "cancelled";
   maxPerOrder: number;
 }) {
   if (rows.length === 0) {
     return (
       <p className="mt-4 text-[var(--mute)]">
-        {waitlist ? "No one is waiting." : "No active participants."}
+        {variant === "waitlist"
+          ? "No one is waiting."
+          : variant === "cancelled"
+            ? "No cancelled participants."
+            : "No active participants."}
       </p>
     );
   }
 
+  const cancelled = variant === "cancelled";
+  const waitlist = variant === "waitlist";
+
   return (
     <div className="mt-6 grid gap-4">
       {rows.map((row) => {
-        const spots = row.spots.filter((s) => s.status !== "CANCELLED");
+        const spots = cancelled ? row.spots : row.spots.filter((s) => s.status !== "CANCELLED");
         const total = spots.reduce((sum, s) => sum + (s.payment?.amountCents ?? 0), 0);
         const currency = spots.find((s) => s.payment)?.payment?.currency ?? "hkd";
         const unpaid = spots.filter(
@@ -295,7 +312,16 @@ function BookingList({
                             </button>
                           </form>
                         ) : null}
-                        {spot.payment?.status !== "PAID" && spots.length > 1 ? (
+                        {spot.payment?.status === "REFUNDED" ? (
+                          <p className="text-xs text-[var(--mute)]">
+                            Refunded{" "}
+                            {formatMoney(
+                              spot.payment.refundAmountCents ?? spot.payment.amountCents,
+                              spot.payment.currency,
+                            )}
+                          </p>
+                        ) : null}
+                        {!cancelled && spot.payment?.status !== "PAID" && spots.length > 1 ? (
                           <form action={removeSpotHostAction} className="mt-2">
                             <input type="hidden" name="spotId" value={spot.id} />
                             <button className="text-xs text-red-800 underline" type="submit">
@@ -310,7 +336,7 @@ function BookingList({
               </table>
             </div>
             <div className="mt-4 flex flex-wrap items-end gap-2">
-              {spots.length < maxPerOrder ? (
+              {!cancelled && spots.length < maxPerOrder ? (
                 <form action={addSpotHostAction} className="flex flex-wrap items-end gap-2">
                   <input type="hidden" name="registrationId" value={row.id} />
                   <div>
@@ -364,12 +390,14 @@ function BookingList({
                   </button>
                 </form>
               ) : null}
-              <form action={cancelAttendanceAction}>
-                <input type="hidden" name="registrationId" value={row.id} />
-                <button className="text-sm text-red-800 underline" type="submit">
-                  Remove booking
-                </button>
-              </form>
+              {!cancelled ? (
+                <form action={cancelAttendanceAction}>
+                  <input type="hidden" name="registrationId" value={row.id} />
+                  <button className="text-sm text-red-800 underline" type="submit">
+                    Remove booking
+                  </button>
+                </form>
+              ) : null}
             </div>
           </div>
         );
