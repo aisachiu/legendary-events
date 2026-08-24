@@ -414,11 +414,13 @@ export async function markPaidAction(formData: FormData) {
           markedPaidById: user.id,
         },
       });
-      await tx.spot.update({
-        where: { id: payment.spotId },
-        data: { status: "CONFIRMED" },
-      });
-      await syncBookingStatus(tx, payment.spot.registrationId);
+      if (payment.spot.status !== "CANCELLED") {
+        await tx.spot.update({
+          where: { id: payment.spotId },
+          data: { status: "CONFIRMED" },
+        });
+        await syncBookingStatus(tx, payment.spot.registrationId);
+      }
     });
   } else if (decision === "reject") {
     await prisma.payment.update({
@@ -446,8 +448,8 @@ export async function markGroupPaidAction(formData: FormData) {
 
   await prisma.$transaction(async (tx) => {
     for (const spot of registration.spots) {
-      if (spot.status === "CANCELLED") continue;
-      if (spot.payment) {
+      if (spot.status === "CANCELLED" && registration.status !== "CANCELLED") continue;
+      if (spot.payment && spot.payment.status !== "PAID" && spot.payment.status !== "REFUNDED") {
         await tx.payment.update({
           where: { id: spot.payment.id },
           data: {
@@ -457,12 +459,16 @@ export async function markGroupPaidAction(formData: FormData) {
           },
         });
       }
-      await tx.spot.update({
-        where: { id: spot.id },
-        data: { status: "CONFIRMED" },
-      });
+      if (spot.status !== "CANCELLED") {
+        await tx.spot.update({
+          where: { id: spot.id },
+          data: { status: "CONFIRMED" },
+        });
+      }
     }
-    await syncBookingStatus(tx, registration.id);
+    if (registration.status !== "CANCELLED") {
+      await syncBookingStatus(tx, registration.id);
+    }
   });
 
   redirectAfterHost(user, next, registration.eventId);
@@ -620,7 +626,7 @@ export async function setGroupTotalAction(formData: FormData) {
 
   const unpaid = registration.spots.filter(
     (s) =>
-      s.status !== "CANCELLED" &&
+      (registration.status === "CANCELLED" || s.status !== "CANCELLED") &&
       s.payment &&
       s.payment.status !== "PAID" &&
       s.payment.status !== "REFUNDED",
