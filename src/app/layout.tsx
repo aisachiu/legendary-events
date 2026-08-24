@@ -19,7 +19,7 @@ const serif = Cormorant_Garamond({
 
 export const metadata: Metadata = {
   title: "Legendary Events",
-  description: "Create events, take signups, and open the room once people are in.",
+  description: "Create events, take signups, and track payments.",
 };
 
 export const dynamic = "force-dynamic";
@@ -38,7 +38,7 @@ export default async function RootLayout({
           <Header user={user} />
           <main className="flex-1">{children}</main>
           <footer className="border-t border-[var(--line)] px-5 py-8 text-center text-sm text-[var(--mute)]">
-            Legendary Events — public signups, networking rooms, and receipt-based payments.
+            Legendary Events. <a href="https://github.com/aisachiu">Andrew Chiu</a>
           </footer>
         </DescopeProviders>
       </body>
