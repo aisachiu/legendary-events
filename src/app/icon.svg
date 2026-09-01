@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" role="img" aria-label="Legendary Events">
+  <rect width="512" height="512" rx="108" fill="#F4F7FB"/>
+  <g transform="translate(256 292) rotate(-18)">
+    <rect x="-118" y="-168" width="72" height="200" rx="36" fill="#0A84FF"/>
+    <rect x="-118" y="32" width="200" height="72" rx="36" fill="#0A84FF"/>
+  </g>
+  <path
+    fill="#12C48B"
+    d="M318 118 330 146 360 150 338 170 344 200 318 186 292 200 298 170 276 150 306 146Z"
+  />
+</svg>
