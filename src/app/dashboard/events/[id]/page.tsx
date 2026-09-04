@@ -12,10 +12,12 @@ import {
   setGroupTotalAction,
   updateSpotAmountAction,
 } from "@/app/actions/payments";
+import { ContactGuests } from "@/components/ContactGuests";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { EventForm } from "@/components/EventForm";
 import { StatusPills } from "@/components/Pills";
 import { getCurrentUser } from "@/lib/auth";
+import { displayContactLine } from "@/lib/contacts";
 import { formatMoney, formatWhen, toDatetimeLocal } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { OCCUPYING_STATUSES } from "@/lib/registrations";
@@ -125,6 +127,16 @@ export default async function EventDeskPage({
       <p className="mt-1 text-sm text-[var(--mute)]">
         Grouped by the person who booked. Mark each name paid, or the whole group.
       </p>
+      <ContactGuests
+        eventTitle={event.title}
+        bookers={event.registrations.map((r) => ({
+          id: r.id,
+          name: r.user.name,
+          email: r.user.email,
+          phone: r.user.phone,
+          status: r.status,
+        }))}
+      />
       <BookingList rows={occupying} variant="participants" maxPerOrder={event.maxPerOrder} />
 
       <h2 className="mt-12 font-serif text-3xl">Waiting list</h2>
@@ -151,7 +163,7 @@ function BookingList({
   rows: {
     id: string;
     status: string;
-    user: { name: string; email: string };
+    user: { name: string; email: string; phone: string | null };
     spots: {
       id: string;
       name: string;
@@ -201,7 +213,7 @@ function BookingList({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="font-serif text-xl">{row.user.name}</p>
-                <p className="text-sm text-[var(--mute)]">{row.user.email}</p>
+                <p className="text-sm text-[var(--mute)]">{displayContactLine(row.user)}</p>
                 <div className="mt-2">
                   <StatusPills registrationStatus={row.status} />
                 </div>
