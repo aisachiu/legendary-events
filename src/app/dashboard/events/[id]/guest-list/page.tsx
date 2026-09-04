@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { ContactGuests } from "@/components/ContactGuests";
 import { AmountsToggle, PrintButton } from "@/components/GuestListControls";
 import { getCurrentUser } from "@/lib/auth";
+import { displayContactLine } from "@/lib/contacts";
 import { formatMoney, formatWhen } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { canManageEvent } from "@/lib/roles";
@@ -22,7 +24,7 @@ type SpotRow = {
 type PartyRow = {
   id: string;
   status: string;
-  user: { name: string; email: string };
+  user: { name: string; email: string; phone: string | null };
   spots: SpotRow[];
 };
 
@@ -55,7 +57,9 @@ function GuestListSection({
             <div key={party.id} className="guest-list-party">
               <p className="font-medium">
                 {party.user.name}{" "}
-                <span className="text-sm font-normal text-[var(--mute)]">({party.user.email})</span>
+                <span className="text-sm font-normal text-[var(--mute)]">
+                  ({displayContactLine(party.user)})
+                </span>
               </p>
               <table className="guest-list-table mt-2 w-full text-sm">
                 <thead>
@@ -129,7 +133,7 @@ export default async function GuestListPage({
   const parties: PartyRow[] = event.registrations.map((r) => ({
     id: r.id,
     status: r.status,
-    user: r.user,
+    user: { name: r.user.name, email: r.user.email, phone: r.user.phone },
     spots: r.spots.map((s) => ({
       id: s.id,
       name: s.name,
@@ -173,6 +177,18 @@ export default async function GuestListPage({
           <AmountsToggle showAmounts={showAmounts} />
         </Suspense>
         <PrintButton />
+      </div>
+      <div className="guest-list-no-print">
+        <ContactGuests
+          eventTitle={event.title}
+          bookers={event.registrations.map((r) => ({
+            id: r.id,
+            name: r.user.name,
+            email: r.user.email,
+            phone: r.user.phone,
+            status: r.status,
+          }))}
+        />
       </div>
 
       <GuestListSection title="Confirmed / paid" parties={confirmed} showAmounts={showAmounts} />

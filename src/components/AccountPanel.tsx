@@ -4,6 +4,7 @@ import { useDescope, useSession, useUser } from "@descope/nextjs-sdk/client";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { sessionJwtAction, syncDescopeUserAction, updateNameAction } from "@/app/actions/auth";
+import { isRealEmail } from "@/lib/contacts";
 import { errText, jwtFromResp, toE164, urlFromResp } from "@/lib/descope-client";
 
 type DescopeUser = {
@@ -23,10 +24,6 @@ function hasGoogle(user: DescopeUser | undefined) {
   if (!user) return false;
   if (user.OAuth?.google || user.oauth?.google) return true;
   return (user.loginIds || []).some((id) => id.toLowerCase().includes("google"));
-}
-
-function isRealEmail(email?: string) {
-  return Boolean(email && email.includes("@") && !email.endsWith("@phone.legendary.events"));
 }
 
 export function AccountPanel({
