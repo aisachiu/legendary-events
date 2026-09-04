@@ -37,11 +37,13 @@ const AUDIENCES: { id: ContactAudience; label: string }[] = [
 export function ContactGuests({
   eventTitle,
   bookers,
+  defaultOpen = false,
 }: {
   eventTitle: string;
   bookers: BookerContact[];
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [audience, setAudience] = useState<ContactAudience>("coming");
   const [flash, setFlash] = useState<string | null>(null);
 

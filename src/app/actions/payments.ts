@@ -352,7 +352,7 @@ export async function saveBioAction(formData: FormData) {
 
 function redirectAfterHost(user: { role: string }, next: string, eventId: string) {
   if (next.startsWith("/admin") && isSuperadmin(user)) redirect(next);
-  redirect(`/dashboard/events/${eventId}`);
+  redirect(`/dashboard/events/${eventId}?mode=manage`);
 }
 
 export async function promoteFromWaitlistAction(formData: FormData) {
