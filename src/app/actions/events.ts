@@ -49,7 +49,7 @@ function failUpdate(id: string, error: string, next: string, user: { role: strin
   if (next.startsWith("/admin") && isSuperadmin(user)) {
     redirect(`${next}${next.includes("?") ? "&" : "?"}error=${error}`);
   }
-  redirect(`/dashboard/events/${id}?error=${error}`);
+  redirect(`/dashboard/events/${id}?tab=details&error=${error}`);
 }
 
 async function resolveCustomSlug(raw: string, excludeId?: string) {
@@ -182,7 +182,7 @@ export async function updateEventAction(formData: FormData) {
   }
 
   if (next.startsWith("/admin") && isSuperadmin(user)) redirect(next);
-  redirect(`/dashboard/events/${id}`);
+  redirect(`/dashboard/events/${id}?tab=details`);
 }
 
 export async function deleteEventAction(formData: FormData) {
