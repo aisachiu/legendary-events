@@ -61,6 +61,7 @@ export default async function EventPage({
           {full ? <Pill tone="warn">Full</Pill> : null}
         </div>
         <h1 className="mt-4 font-serif text-5xl">{event.title}</h1>
+        <p className="mt-2 text-lg text-[var(--mute)]">{channel.name}</p>
         <p className="mt-6 text-sm text-[var(--mute)]">
           {formatWhen(channel.startsAt)} — {formatWhen(channel.endsAt)}
           <br />
