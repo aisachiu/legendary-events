@@ -4,6 +4,7 @@ import { EventContactBox } from "@/components/EventContactBox";
 import { PartyFields, QuotaNotice } from "@/components/PartyFields";
 import { StatusPills } from "@/components/Pills";
 import { getCurrentUser } from "@/lib/auth";
+import { getChannelBySlug } from "@/lib/channels";
 import { formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { canSeeEventContact } from "@/lib/registrations";
@@ -18,8 +19,8 @@ export default async function ConfirmationPage({
   const { slug } = await params;
   const { error, remaining, wanted } = await searchParams;
   const user = await getCurrentUser();
-  const event = await prisma.event.findUnique({ where: { slug } });
-  if (!event || !user) {
+  const channel = await getChannelBySlug(slug);
+  if (!channel || !user) {
     return (
       <div className="mx-auto max-w-lg px-5 py-16">
         <p>Sign in to see your confirmation.</p>
@@ -28,7 +29,7 @@ export default async function ConfirmationPage({
   }
 
   const registration = await prisma.registration.findUnique({
-    where: { eventId_userId: { eventId: event.id, userId: user.id } },
+    where: { channelId_userId: { channelId: channel.id, userId: user.id } },
     include: { spots: { include: { payment: true }, orderBy: { createdAt: "asc" } } },
   });
   if (!registration) {
@@ -62,7 +63,7 @@ export default async function ConfirmationPage({
                 ? "Evidence is with the host"
                 : "Almost in"}
       </h1>
-      <p className="mt-3 text-[var(--mute)]">{event.title}</p>
+      <p className="mt-3 text-[var(--mute)]">{channel.event.title}</p>
       <div className="mt-4">
         <StatusPills registrationStatus={registration.status} />
       </div>
@@ -77,10 +78,10 @@ export default async function ConfirmationPage({
           </li>
         ))}
       </ul>
-      {event.isPaid && dueCents > 0 ? (
+      {channel.isPaid && dueCents > 0 ? (
         <p className="mt-4 text-sm">
           Total due (you are the account holder):{" "}
-          <strong>{formatMoney(dueCents, event.currency)}</strong>
+          <strong>{formatMoney(dueCents, channel.currency)}</strong>
         </p>
       ) : null}
       {waitlisted ? (
@@ -96,26 +97,26 @@ export default async function ConfirmationPage({
         </p>
       ) : null}
 
-      {canSeeEventContact(user, event, registration) && event.contactDetails ? (
-        <EventContactBox details={event.contactDetails} />
+      {canSeeEventContact(user, channel.event, channel, registration) && channel.contactDetails ? (
+        <EventContactBox details={channel.contactDetails} />
       ) : null}
 
-      {registration.status !== "CANCELLED" && event.maxPerOrder > 0 ? (
+      {registration.status !== "CANCELLED" && channel.maxPerOrder > 0 ? (
         <form action={updatePartyAction} className="card mt-8 space-y-3 p-5">
           <input type="hidden" name="slug" value={slug} />
           <p className="font-serif text-2xl">People in your booking</p>
           {error === "quota" && remaining && wanted ? (
             <QuotaNotice remaining={Number(remaining)} wanted={Number(wanted)} />
           ) : error === "party" ? (
-            <p className="text-sm text-red-800">Stay within {event.maxPerOrder} names.</p>
+            <p className="text-sm text-red-800">Stay within {channel.maxPerOrder} names.</p>
           ) : null}
           <PartyFields
-            maxPerOrder={event.maxPerOrder}
+            maxPerOrder={channel.maxPerOrder}
             defaultHolder={holder?.name ?? user.name}
             defaultGuests={guests.map((g) => g.name)}
             defaultShowOnGoing={activeSpots.map((s) => s.showOnGoing)}
             requireHolderName
-            showGoingOptIn={event.isNetworking}
+            showGoingOptIn={channel.isNetworking}
           />
           <button className="btn-gold" type="submit">
             Save names
@@ -127,14 +128,14 @@ export default async function ConfirmationPage({
         <Link href={`/events/${slug}`} className="btn-line">
           Event page
         </Link>
-        {confirmed && event.isNetworking ? (
+        {confirmed && channel.isNetworking ? (
           <Link href={`/events/${slug}/going`} className="btn-gold">
             Who&apos;s Going
           </Link>
         ) : null}
         {!confirmed &&
         !waitlisted &&
-        event.isPaid &&
+        channel.isPaid &&
         registration.status !== "CANCELLED" ? (
           <Link href={`/events/${slug}/pay`} className="btn-gold">
             Upload receipt

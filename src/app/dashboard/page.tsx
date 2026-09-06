@@ -25,19 +25,32 @@ export default async function DashboardPage({
 
   const events = await prisma.event.findMany({
     where: isSuperadmin(user) ? undefined : { organizerId: user.id },
-    orderBy: { startsAt: "asc" },
     include: {
-      registrations: {
+      channels: {
+        orderBy: { createdAt: "asc" },
         include: {
-          spots: { include: { payment: true } },
+          registrations: {
+            include: {
+              spots: { include: { payment: true } },
+            },
+          },
         },
       },
     },
   });
 
+  const hosted = [...events].sort((a, b) => {
+    const aStart = a.channels[0]?.startsAt?.getTime() ?? a.createdAt.getTime();
+    const bStart = b.channels[0]?.startsAt?.getTime() ?? b.createdAt.getTime();
+    return aStart - bStart;
+  });
+
   const mine = await prisma.registration.findMany({
     where: { userId: user.id },
-    include: { event: true, spots: { include: { payment: true } } },
+    include: {
+      channel: { include: { event: true } },
+      spots: { include: { payment: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
 
@@ -57,23 +70,31 @@ export default async function DashboardPage({
       ) : null}
 
       <section className="mt-10 grid gap-4">
-        {events.map((event) => {
-          const occupying = event.registrations.reduce(
+        {hosted.map((event) => {
+          const registrations = event.channels.flatMap((c) => c.registrations);
+          const occupying = registrations.reduce(
             (n, r) =>
-              n + r.spots.filter((s) => (OCCUPYING_STATUSES as readonly string[]).includes(s.status)).length,
+              n +
+              r.spots.filter((s) => (OCCUPYING_STATUSES as readonly string[]).includes(s.status))
+                .length,
             0,
           );
-          const pending = event.registrations.reduce(
+          const pending = registrations.reduce(
             (n, r) =>
               n + r.spots.filter((s) => s.payment?.status === "AWAITING_REVIEW").length,
             0,
           );
-          const waitlisted = event.registrations.reduce(
+          const waitlisted = registrations.reduce(
             (n, r) => n + r.spots.filter((s) => s.status === "WAITLISTED").length,
             0,
           );
+          const capacitySum = event.channels.reduce(
+            (n, c) => (c.capacity == null ? n : (n ?? 0) + c.capacity),
+            null as number | null,
+          );
+          const primary = event.channels[0];
           const occupancy =
-            event.capacity != null ? `${occupying} / ${event.capacity} in` : `${occupying} in`;
+            capacitySum != null ? `${occupying} / ${capacitySum} in` : `${occupying} in`;
           return (
             <Link
               key={event.id}
@@ -83,7 +104,7 @@ export default async function DashboardPage({
               <div>
                 <h2 className="font-serif text-2xl">{event.title}</h2>
                 <p className="text-sm text-[var(--mute)]">
-                  {formatWhen(event.startsAt)} · {occupancy}
+                  {primary ? formatWhen(primary.startsAt) : "No channel yet"} · {occupancy}
                   {waitlisted ? ` · ${waitlisted} waitlisted` : ""}
                   {pending ? ` · ${pending} evidence to review` : ""}
                 </p>
@@ -92,7 +113,7 @@ export default async function DashboardPage({
             </Link>
           );
         })}
-        {events.length === 0 ? (
+        {hosted.length === 0 ? (
           <p className="text-[var(--mute)]">No events yet. Publish your first night.</p>
         ) : null}
       </section>
@@ -101,10 +122,10 @@ export default async function DashboardPage({
         <h2 className="font-serif text-3xl">Your tickets</h2>
         <div className="mt-4 grid gap-3">
           {mine.map((row) => (
-            <Link key={row.id} href={`/events/${row.event.slug}`} className="card p-5">
-              <p className="font-serif text-xl">{row.event.title}</p>
+            <Link key={row.id} href={`/events/${row.channel.slug}`} className="card p-5">
+              <p className="font-serif text-xl">{row.channel.event.title}</p>
               <p className="text-sm text-[var(--mute)]">
-                {registrationLabel[row.status] ?? row.status}
+                {row.channel.name} · {registrationLabel[row.status] ?? row.status}
                 {row.spots.length > 1 ? ` · ${row.spots.length} spots` : ""}
               </p>
             </Link>

@@ -3,11 +3,11 @@ import { canManageEvent } from "@/lib/roles";
 export const OCCUPYING_STATUSES = ["CONFIRMED", "PENDING_PAYMENT"] as const;
 export const HELD_STATUSES = ["CONFIRMED", "PENDING_PAYMENT", "WAITLISTED"] as const;
 
-export function occupyingSpotWhere(eventId: string, excludeRegistrationId?: string) {
+export function occupyingSpotWhere(channelId: string, excludeRegistrationId?: string) {
   return {
     status: { in: [...OCCUPYING_STATUSES] },
     registration: {
-      eventId,
+      channelId,
       ...(excludeRegistrationId ? { id: { not: excludeRegistrationId } } : {}),
     },
   };
@@ -35,10 +35,11 @@ export function remainingSeats(capacity: number | null, occupyingOthers: number)
 
 export function canSeeEventContact(
   user: { id: string; role: string } | null,
-  event: { organizerId: string; contactDetails: string | null },
+  event: { organizerId: string },
+  channel: { contactDetails: string | null },
   registration: { status: string } | null,
 ) {
-  if (!event.contactDetails?.trim()) return false;
+  if (!channel.contactDetails?.trim()) return false;
   if (canManageEvent(user, event.organizerId)) return true;
   return Boolean(registration && registration.status !== "CANCELLED");
 }

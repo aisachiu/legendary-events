@@ -30,12 +30,13 @@ export function previewEventPath(title: string, slugInput: string) {
   return parseEventSlug(slugInput) || slugifyBase(title) || "your-event";
 }
 
+/** Allocate a globally unique Channel.slug. excludeId is a Channel id. */
 export async function allocateEventSlug(desired: string, excludeId?: string) {
   const base = slugifyBase(desired) || "event";
   let candidate = base;
   let n = 2;
   while (true) {
-    const existing = await prisma.event.findUnique({
+    const existing = await prisma.channel.findUnique({
       where: { slug: candidate },
       select: { id: true },
     });
@@ -46,8 +47,9 @@ export async function allocateEventSlug(desired: string, excludeId?: string) {
   }
 }
 
+/** excludeId is a Channel id. */
 export async function eventSlugTaken(slug: string, excludeId?: string) {
-  const existing = await prisma.event.findUnique({
+  const existing = await prisma.channel.findUnique({
     where: { slug },
     select: { id: true },
   });

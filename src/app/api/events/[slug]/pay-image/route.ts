@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { getChannelBySlug } from "@/lib/channels";
 import { prisma } from "@/lib/prisma";
 import { canManageEvent } from "@/lib/roles";
 import { readPrivateFile } from "@/lib/storage";
@@ -14,19 +15,19 @@ export async function GET(
   }
 
   const { slug } = await params;
-  const event = await prisma.event.findUnique({ where: { slug } });
-  if (!event?.paymentImagePath) {
+  const channel = await getChannelBySlug(slug);
+  if (!channel?.paymentImagePath) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const signup = await prisma.registration.findUnique({
-    where: { eventId_userId: { eventId: event.id, userId: user.id } },
+    where: { channelId_userId: { channelId: channel.id, userId: user.id } },
   });
-  if (!signup && !canManageEvent(user, event.organizerId)) {
+  if (!signup && !canManageEvent(user, channel.event.organizerId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const file = await readPrivateFile(event.paymentImagePath);
+  const file = await readPrivateFile(channel.paymentImagePath);
   if (!file) {
     return NextResponse.json({ error: "File missing" }, { status: 404 });
   }

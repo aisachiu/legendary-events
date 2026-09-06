@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { submitOfflinePaymentAction } from "@/app/actions/payments";
 import { getCurrentUser } from "@/lib/auth";
+import { getChannelBySlug } from "@/lib/channels";
 import { stripHtml } from "@/lib/event-html";
 import { formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -28,11 +29,11 @@ export default async function PayPage({
     );
   }
 
-  const event = await prisma.event.findUnique({ where: { slug } });
-  if (!event) return null;
+  const channel = await getChannelBySlug(slug);
+  if (!channel) return null;
 
   const registration = await prisma.registration.findUnique({
-    where: { eventId_userId: { eventId: event.id, userId: user.id } },
+    where: { channelId_userId: { channelId: channel.id, userId: user.id } },
     include: { spots: { include: { payment: true }, orderBy: { createdAt: "asc" } } },
   });
   if (!registration) {
@@ -68,8 +69,8 @@ export default async function PayPage({
     <div className="mx-auto max-w-2xl px-5 py-12">
       <h1 className="font-serif text-4xl">Complete Payment to Confirm Your Spot</h1>
       <p className="mt-2 text-[var(--mute)]">
-        {formatMoney(event.priceCents, event.currency)} per person. You are the account holder.
-        Total due: <strong>{formatMoney(dueCents, event.currency)}</strong> for {dueSpots.length}{" "}
+        {formatMoney(channel.priceCents, channel.currency)} per person. You are the account holder.
+        Total due: <strong>{formatMoney(dueCents, channel.currency)}</strong> for {dueSpots.length}{" "}
         {dueSpots.length === 1 ? "spot" : "spots"}. You can upload payment evidence here or
         directly inform the host.
       </p>
@@ -98,11 +99,11 @@ export default async function PayPage({
       ) : null}
       {error ? <p className="mt-4 text-sm text-red-800">{error}</p> : null}
 
-      {event.paymentInstructions && stripHtml(event.paymentInstructions) ? (
+      {channel.paymentInstructions && stripHtml(channel.paymentInstructions) ? (
         <div className="card mt-8 p-6">
           <h2 className="font-serif text-2xl">How to pay</h2>
           <div className="mt-3">
-            <EventHtml className="event-prose leading-7" html={event.paymentInstructions} />
+            <EventHtml className="event-prose leading-7" html={channel.paymentInstructions} />
           </div>
         </div>
       ) : null}

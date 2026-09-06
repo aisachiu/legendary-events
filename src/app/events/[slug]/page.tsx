@@ -6,6 +6,7 @@ import { EventHtml } from "@/components/EventHtml";
 import { PartyFields, QuotaNotice } from "@/components/PartyFields";
 import { Pill } from "@/components/Pills";
 import { getCurrentUser } from "@/lib/auth";
+import { getChannelBySlug } from "@/lib/channels";
 import { formatMoney, formatWhen } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { canSeeEventContact, eventIsFull, formatSignupCount, occupyingSpotWhere } from "@/lib/registrations";
@@ -20,41 +21,39 @@ export default async function EventPage({
   const { slug } = await params;
   const { error, remaining, wanted } = await searchParams;
   const user = await getCurrentUser();
-  const event = await prisma.event.findUnique({
-    where: { slug },
-    include: { organizer: true },
-  });
-  if (!event || !event.published) {
+  const channel = await getChannelBySlug(slug);
+  if (!channel) {
     return (
       <div className="mx-auto max-w-xl px-5 py-16">
         <p>That event is not public.</p>
       </div>
     );
   }
+  const event = channel.event;
 
   const occupying = await prisma.spot.count({
-    where: occupyingSpotWhere(event.id),
+    where: occupyingSpotWhere(channel.id),
   });
-  const full = eventIsFull(occupying, event.capacity);
+  const full = eventIsFull(occupying, channel.capacity);
 
   const mine = user
     ? await prisma.registration.findUnique({
-        where: { eventId_userId: { eventId: event.id, userId: user.id } },
+        where: { channelId_userId: { channelId: channel.id, userId: user.id } },
         include: { spots: { include: { payment: true } } },
       })
     : null;
 
   const showSignup = !mine || mine.status === "CANCELLED";
-  const priceLabel = event.isPaid
-    ? `${formatMoney(event.priceCents, event.currency)} per person`
+  const priceLabel = channel.isPaid
+    ? `${formatMoney(channel.priceCents, channel.currency)} per person`
     : null;
 
   return (
     <div className="mx-auto grid max-w-5xl gap-10 px-5 py-12 lg:grid-cols-[1.2fr_0.8fr]">
       <article>
         <div className="flex flex-wrap gap-2">
-          {event.isNetworking ? <Pill>Who&apos;s Going</Pill> : null}
-          {event.isPaid ? (
+          {channel.isNetworking ? <Pill>Who&apos;s Going</Pill> : null}
+          {channel.isPaid ? (
             <Pill>{priceLabel}</Pill>
           ) : (
             <Pill tone="ok">Free</Pill>
@@ -62,20 +61,21 @@ export default async function EventPage({
           {full ? <Pill tone="warn">Full</Pill> : null}
         </div>
         <h1 className="mt-4 font-serif text-5xl">{event.title}</h1>
+        <p className="mt-2 text-lg text-[var(--mute)]">{channel.name}</p>
         <p className="mt-6 text-sm text-[var(--mute)]">
-          {formatWhen(event.startsAt)} — {formatWhen(event.endsAt)}
+          {formatWhen(channel.startsAt)} — {formatWhen(channel.endsAt)}
           <br />
-          {event.venue} · Hosted by {event.organizer.name} ·{" "}
-          {formatSignupCount(occupying, event.capacity)}
+          {channel.venue} · Hosted by {event.organizer.name} ·{" "}
+          {formatSignupCount(occupying, channel.capacity)}
         </p>
-        <EventHtml html={event.description} />
-        {canSeeEventContact(user, event, mine) && event.contactDetails ? (
-          <EventContactBox details={event.contactDetails} />
+        <EventHtml html={channel.description} />
+        {canSeeEventContact(user, event, channel, mine) && channel.contactDetails ? (
+          <EventContactBox details={channel.contactDetails} />
         ) : null}
-        {event.isNetworking ? (
+        {channel.isNetworking ? (
           <p className="mt-8 text-sm text-[var(--mute)]">
             Who&apos;s Going stays closed until your place is confirmed
-            {event.isPaid ? " (after the host accepts your receipt)" : ""}.
+            {channel.isPaid ? " (after the host accepts your receipt)" : ""}.
           </p>
         ) : null}
       </article>
@@ -101,7 +101,7 @@ export default async function EventPage({
               <Link href={`/events/${slug}/confirmation`} className="btn-line">
                 View confirmation
               </Link>
-              {event.isNetworking ? (
+              {channel.isNetworking ? (
                 <Link href={`/events/${slug}/going`} className="btn-gold">
                   Who&apos;s Going
                 </Link>
@@ -117,7 +117,7 @@ export default async function EventPage({
                 mine.spots
                   .filter((s) => s.payment && s.payment.status !== "PAID" && s.payment.status !== "REFUNDED")
                   .reduce((sum, s) => sum + (s.payment?.amountCents ?? 0), 0),
-                event.currency,
+                channel.currency,
               )}
               . You can upload payment evidence here or directly inform the host.
             </p>
@@ -163,12 +163,12 @@ export default async function EventPage({
                 <input type="hidden" name="slug" value={slug} />
                 <p className="text-sm text-[var(--mute)]">Signing up as {user.name}.</p>
                 <PartyFields
-                  maxPerOrder={event.maxPerOrder}
+                  maxPerOrder={channel.maxPerOrder}
                   defaultHolder={user.name}
                   requireHolderName
-                  showGoingOptIn={event.isNetworking}
+                  showGoingOptIn={channel.isNetworking}
                 />
-                {event.isNetworking ? (
+                {channel.isNetworking ? (
                   <>
                     <div>
                       <label className="label">Title / position</label>
@@ -191,7 +191,7 @@ export default async function EventPage({
                 <button className="btn-gold w-full" type="submit">
                   {full
                     ? "Join waitlist"
-                    : event.isPaid
+                    : channel.isPaid
                       ? "Hold my place"
                       : "Confirm my place"}
                 </button>

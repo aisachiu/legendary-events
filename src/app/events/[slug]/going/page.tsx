@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { saveBioAction } from "@/app/actions/payments";
 import { getCurrentUser } from "@/lib/auth";
+import { getChannelBySlug } from "@/lib/channels";
 import { prisma } from "@/lib/prisma";
 
 export default async function GoingPage({
@@ -10,8 +11,8 @@ export default async function GoingPage({
 }) {
   const { slug } = await params;
   const user = await getCurrentUser();
-  const event = await prisma.event.findUnique({ where: { slug } });
-  if (!event?.isNetworking) {
+  const channel = await getChannelBySlug(slug);
+  if (!channel?.isNetworking) {
     return (
       <div className="mx-auto max-w-lg px-5 py-16">
         <p>This event does not have a Who&apos;s Going list.</p>
@@ -30,7 +31,7 @@ export default async function GoingPage({
   }
 
   const mine = await prisma.registration.findUnique({
-    where: { eventId_userId: { eventId: event.id, userId: user.id } },
+    where: { channelId_userId: { channelId: channel.id, userId: user.id } },
     include: { spots: true },
   });
   const iAmConfirmed = mine?.spots.some((s) => s.status === "CONFIRMED");
@@ -40,7 +41,7 @@ export default async function GoingPage({
         <p className="font-serif text-3xl">Who&apos;s Going is still closed for you.</p>
         <p className="mt-3 text-[var(--mute)]">
           The list unlocks after signup is confirmed
-          {event.isPaid ? ", including when the host marks your receipt as paid" : ""}.
+          {channel.isPaid ? ", including when the host marks your receipt as paid" : ""}.
         </p>
         <Link className="btn-gold mt-6" href={`/events/${slug}`}>
           Back to the event
@@ -49,8 +50,19 @@ export default async function GoingPage({
     );
   }
 
+  const goingWhere =
+    channel.goingVisibility === "EVENT"
+      ? {
+          status: "CONFIRMED" as const,
+          registration: { channel: { eventId: channel.eventId } },
+        }
+      : {
+          status: "CONFIRMED" as const,
+          registration: { channelId: channel.id },
+        };
+
   const spots = await prisma.spot.findMany({
-    where: { status: "CONFIRMED", registration: { eventId: event.id } },
+    where: goingWhere,
     include: { registration: { include: { user: true } } },
     orderBy: { createdAt: "asc" },
   });
@@ -59,7 +71,7 @@ export default async function GoingPage({
   return (
     <div className="mx-auto max-w-5xl px-5 py-12">
       <p className="text-xs uppercase tracking-[0.2em] text-[var(--gold-ink)]">Who&apos;s Going</p>
-      <h1 className="mt-2 font-serif text-4xl">{event.title}</h1>
+      <h1 className="mt-2 font-serif text-4xl">{channel.event.title}</h1>
       <p className="mt-2 text-[var(--mute)]">
         Confirmed guests only. {spots.length} going.
       </p>
