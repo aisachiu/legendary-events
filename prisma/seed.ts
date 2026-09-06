@@ -2,6 +2,60 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+async function upsertEventWithChannel(opts: {
+  channelSlug: string;
+  title: string;
+  visibility?: string;
+  channel: {
+    name: string;
+    summary: string;
+    description: string;
+    venue: string;
+    startsAt: Date;
+    endsAt: Date;
+    isNetworking: boolean;
+    isPaid: boolean;
+    priceCents: number;
+    currency?: string;
+    capacity?: number | null;
+    allowOfflinePayment: boolean;
+    paymentInstructions?: string | null;
+  };
+  organizerId: string;
+}) {
+  const existing = await prisma.channel.findUnique({
+    where: { slug: opts.channelSlug },
+    include: { event: true },
+  });
+  if (existing) return existing.event;
+
+  return prisma.event.create({
+    data: {
+      title: opts.title,
+      visibility: opts.visibility ?? "PUBLIC",
+      organizerId: opts.organizerId,
+      channels: {
+        create: {
+          name: opts.channel.name,
+          slug: opts.channelSlug,
+          summary: opts.channel.summary,
+          description: opts.channel.description,
+          venue: opts.channel.venue,
+          startsAt: opts.channel.startsAt,
+          endsAt: opts.channel.endsAt,
+          isNetworking: opts.channel.isNetworking,
+          isPaid: opts.channel.isPaid,
+          priceCents: opts.channel.priceCents,
+          currency: opts.channel.currency ?? "usd",
+          capacity: opts.channel.capacity ?? null,
+          allowOfflinePayment: opts.channel.allowOfflinePayment,
+          paymentInstructions: opts.channel.paymentInstructions ?? null,
+        },
+      },
+    },
+  });
+}
+
 async function main() {
   const host = await prisma.user.upsert({
     where: { email: "host@legendary.events" },
@@ -51,12 +105,12 @@ async function main() {
   const dinnerEnds = new Date(dinnerStarts);
   dinnerEnds.setHours(22, 0, 0, 0);
 
-  await prisma.event.upsert({
-    where: { slug: "gold-circle-mixer" },
-    update: {},
-    create: {
-      slug: "gold-circle-mixer",
-      title: "Gold Circle Mixer",
+  await upsertEventWithChannel({
+    channelSlug: "gold-circle-mixer",
+    title: "Gold Circle Mixer",
+    organizerId: host.id,
+    channel: {
+      name: "Main",
       summary: "A night for founders, operators, and people who actually ship.",
       description:
         "Small-room networking with introductions, not badge-scanning. After you sign up and your place is confirmed, you can read every attendee bio and share yours.\n\nDress: dark and easy. Phones down after the first toast.",
@@ -70,16 +124,15 @@ async function main() {
       allowOfflinePayment: true,
       paymentInstructions:
         "Transfer $45 to the host and put your name in the memo. Then upload a screenshot here.",
-      organizerId: host.id,
     },
   });
 
-  await prisma.event.upsert({
-    where: { slug: "saturday-open-house" },
-    update: {},
-    create: {
-      slug: "saturday-open-house",
-      title: "Saturday Open House",
+  await upsertEventWithChannel({
+    channelSlug: "saturday-open-house",
+    title: "Saturday Open House",
+    organizerId: host.id,
+    channel: {
+      name: "Main",
       summary: "Walk through the space, meet the hosts, stay for coffee.",
       description:
         "Free and open. No bios, no tickets — just show up and say hello. Good if you want to see Legendary Events before buying into a ticketed night.",
@@ -90,16 +143,15 @@ async function main() {
       isPaid: false,
       priceCents: 0,
       allowOfflinePayment: false,
-      organizerId: host.id,
     },
   });
 
-  await prisma.event.upsert({
-    where: { slug: "founders-table" },
-    update: {},
-    create: {
-      slug: "founders-table",
-      title: "Founders Table",
+  await upsertEventWithChannel({
+    channelSlug: "founders-table",
+    title: "Founders Table",
+    organizerId: host.id,
+    channel: {
+      name: "Main",
       summary: "Twelve seats. One long dinner. Pay by card or bank transfer.",
       description:
         "A seated dinner for people running companies. Pay off-platform (transfer, cash, invoice) and upload a receipt here. The host marks you paid once they can see it.\n\nConfirmed guests unlock the table bios.",
@@ -112,7 +164,6 @@ async function main() {
       currency: "hkd",
       capacity: 12,
       allowOfflinePayment: true,
-      organizerId: host.id,
     },
   });
 

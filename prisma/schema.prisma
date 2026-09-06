@@ -27,36 +27,50 @@ model SiteSettings {
 }
 
 model Event {
-  id                    String         @id @default(cuid())
-  slug                  String         @unique
-  title                 String
-  summary               String         @default("")
-  description           String
-  venue                 String
-  startsAt              DateTime
-  endsAt                DateTime
-  isNetworking          Boolean        @default(false)
-  isPaid                Boolean        @default(false)
-  priceCents            Int            @default(0)
-  currency              String         @default("usd")
-  allowOfflinePayment   Boolean        @default(true)
-  published             Boolean        @default(true)
-  capacity              Int?
-  maxPerOrder           Int            @default(1)
-  themeId               String?
-  contactDetails        String?
-  paymentInstructions   String?
-  paymentImagePath      String?
-  organizerId           String
-  organizer             User           @relation(fields: [organizerId], references: [id])
-  createdAt             DateTime       @default(now())
-  registrations         Registration[]
+  id          String    @id @default(cuid())
+  title       String
+  /// PUBLIC = listed on the home page; UNLISTED = link-only via channel URLs
+  visibility  String    @default("PUBLIC")
+  organizerId String
+  organizer   User      @relation(fields: [organizerId], references: [id])
+  createdAt   DateTime  @default(now())
+  channels    Channel[]
+}
+
+model Channel {
+  id                  String         @id @default(cuid())
+  eventId             String
+  event               Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name                String
+  slug                String         @unique
+  summary             String         @default("")
+  description         String
+  venue               String
+  startsAt            DateTime
+  endsAt              DateTime
+  isNetworking        Boolean        @default(false)
+  isPaid              Boolean        @default(false)
+  priceCents          Int            @default(0)
+  currency            String         @default("usd")
+  allowOfflinePayment Boolean        @default(true)
+  capacity            Int?
+  maxPerOrder         Int            @default(1)
+  themeId             String?
+  contactDetails      String?
+  paymentInstructions String?
+  paymentImagePath    String?
+  /// CHANNEL = only this channel; EVENT = all channels of the event (no other channel URLs exposed)
+  goingVisibility     String         @default("CHANNEL")
+  createdAt           DateTime       @default(now())
+  registrations       Registration[]
+
+  @@index([eventId])
 }
 
 model Registration {
   id            String   @id @default(cuid())
-  eventId       String
-  event         Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  channelId     String
+  channel       Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
   userId        String
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   status        String   @default("PENDING_PAYMENT")
@@ -67,7 +81,7 @@ model Registration {
   createdAt     DateTime @default(now())
   spots         Spot[]
 
-  @@unique([eventId, userId])
+  @@unique([channelId, userId])
 }
 
 model Spot {
@@ -83,21 +97,21 @@ model Spot {
 }
 
 model Payment {
-  id                 String       @id @default(cuid())
-  spotId             String       @unique
-  spot               Spot         @relation(fields: [spotId], references: [id], onDelete: Cascade)
-  method             String
-  status             String
-  amountCents        Int
-  currency           String       @default("usd")
-  evidencePath       String?
-  evidenceNote       String?
-  markedPaidAt       DateTime?
-  markedPaidById     String?
-  markedPaidBy       User?        @relation("MarkedBy", fields: [markedPaidById], references: [id])
-  refundedAt         DateTime?
-  refundNote         String?
-  refundAmountCents  Int?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  id                String    @id @default(cuid())
+  spotId            String    @unique
+  spot              Spot      @relation(fields: [spotId], references: [id], onDelete: Cascade)
+  method            String
+  status            String
+  amountCents       Int
+  currency          String    @default("usd")
+  evidencePath      String?
+  evidenceNote      String?
+  markedPaidAt      DateTime?
+  markedPaidById    String?
+  markedPaidBy      User?     @relation("MarkedBy", fields: [markedPaidById], references: [id])
+  refundedAt        DateTime?
+  refundNote        String?
+  refundAmountCents Int?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }

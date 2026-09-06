@@ -21,6 +21,8 @@ export function GuestManageList({
   rows: {
     id: string;
     status: string;
+    channelName?: string;
+    maxPerOrder?: number;
     user: { name: string; email: string; phone: string | null };
     spots: {
       id: string;
@@ -70,7 +72,14 @@ export function GuestManageList({
           <div key={row.id} className="card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="font-serif text-xl">{row.user.name}</p>
+                <p className="font-serif text-xl">
+                  {row.user.name}
+                  {row.channelName ? (
+                    <span className="ml-2 align-middle text-xs font-sans font-normal text-[var(--mute)]">
+                      · {row.channelName}
+                    </span>
+                  ) : null}
+                </p>
                 <p className="text-sm text-[var(--mute)]">{displayContactLine(row.user)}</p>
                 <div className="mt-2">
                   <StatusPills registrationStatus={row.status} />
@@ -206,7 +215,7 @@ export function GuestManageList({
               </table>
             </div>
             <div className="mt-4 flex flex-wrap items-end gap-2">
-              {!cancelled && spots.length < maxPerOrder ? (
+              {!cancelled && spots.length < (row.maxPerOrder ?? maxPerOrder) ? (
                 <form action={addSpotHostAction} className="flex flex-wrap items-end gap-2">
                   <input type="hidden" name="registrationId" value={row.id} />
                   <div>

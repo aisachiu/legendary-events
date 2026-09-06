@@ -33,3 +33,39 @@ export function PrintButton() {
     </button>
   );
 }
+
+export function ChannelFilter({
+  channels,
+  channelFilter,
+}: {
+  channels: { id: string; name: string }[];
+  channelFilter: string;
+}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  return (
+    <label className="flex items-center gap-2 text-sm">
+      <span className="text-[var(--mute)]">Channel</span>
+      <select
+        className="field py-1"
+        value={channelFilter}
+        onChange={(e) => {
+          const params = new URLSearchParams(searchParams.toString());
+          const value = e.target.value;
+          if (!value || value === "all") params.delete("channel");
+          else params.set("channel", value);
+          const q = params.toString();
+          router.replace(q ? `?${q}` : "?");
+        }}
+      >
+        <option value="all">All channels</option>
+        {channels.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}

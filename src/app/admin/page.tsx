@@ -36,17 +36,29 @@ export default async function AdminPage({
   const [users, events, registrations, payments, siteSettings] = await Promise.all([
     prisma.user.findMany({ orderBy: { createdAt: "desc" } }),
     prisma.event.findMany({
-      orderBy: { startsAt: "asc" },
-      include: { organizer: true },
+      include: {
+        organizer: true,
+        channels: { orderBy: { createdAt: "asc" } },
+      },
     }),
     prisma.registration.findMany({
       orderBy: { createdAt: "desc" },
-      include: { user: true, event: true, spots: { include: { payment: true } } },
+      include: {
+        user: true,
+        channel: { include: { event: true } },
+        spots: { include: { payment: true } },
+      },
     }),
     prisma.payment.findMany({
       orderBy: { createdAt: "desc" },
       include: {
-        spot: { include: { registration: { include: { user: true, event: true } } } },
+        spot: {
+          include: {
+            registration: {
+              include: { user: true, channel: { include: { event: true } } },
+            },
+          },
+        },
       },
     }),
     prisma.siteSettings.findUnique({ where: { id: "default" } }),
@@ -171,33 +183,61 @@ export default async function AdminPage({
       <section className="mt-12">
         <h2 className="font-serif text-3xl">Events ({events.length})</h2>
         <div className="mt-4 grid gap-6">
-          {events.map((event) => (
+          {events.map((event) => {
+            const channel = event.channels[0];
+            if (!channel) {
+              return (
+                <div key={event.id} className="card p-5">
+                  <p className="font-serif text-xl">{event.title}</p>
+                  <p className="text-sm text-[var(--mute)]">No channels</p>
+                  <form action={deleteEventAction} className="mt-3">
+                    <input type="hidden" name="id" value={event.id} />
+                    <button className="btn-line text-red-800" type="submit">
+                      Delete event
+                    </button>
+                  </form>
+                </div>
+              );
+            }
+            return (
             <div key={event.id} className="card p-5">
               <p className="text-sm text-[var(--mute)]">
-                Host {event.organizer.name} ({event.organizer.email}) · {formatWhen(event.startsAt)}
+                Host {event.organizer.name} ({event.organizer.email}) · {formatWhen(channel.startsAt)} · {channel.name}
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <code className="max-w-full truncate text-xs">{publicEventUrl(event.slug)}</code>
-                <CopyLinkButton url={publicEventUrl(event.slug)} label="Copy public link" />
+                <code className="max-w-full truncate text-xs">{publicEventUrl(channel.slug)}</code>
+                <CopyLinkButton url={publicEventUrl(channel.slug)} label="Copy public link" />
               </div>
               <form action={updateEventAction} className="mt-4 grid gap-3 sm:grid-cols-2">
                 <input type="hidden" name="id" value={event.id} />
+                <input type="hidden" name="channelId" value={channel.id} />
                 <input type="hidden" name="next" value="/admin" />
                 <div className="sm:col-span-2">
                   <label className="label">Title</label>
                   <input className="field" name="title" defaultValue={event.title} />
                 </div>
+                <div>
+                  <label className="label">Channel name</label>
+                  <input className="field" name="channelName" defaultValue={channel.name} />
+                </div>
+                <div>
+                  <label className="label">Visibility</label>
+                  <select className="field" name="visibility" defaultValue={event.visibility}>
+                    <option value="PUBLIC">Public</option>
+                    <option value="UNLISTED">Unlisted</option>
+                  </select>
+                </div>
                 <div className="sm:col-span-2">
                   <label className="label">Link slug</label>
-                  <input className="field font-mono text-sm" name="slug" defaultValue={event.slug} />
+                  <input className="field font-mono text-sm" name="slug" defaultValue={channel.slug} />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="label">Description</label>
-                  <textarea className="field min-h-24" name="description" defaultValue={event.description} />
+                  <textarea className="field min-h-24" name="description" defaultValue={channel.description} />
                 </div>
                 <div>
                   <label className="label">Venue</label>
-                  <input className="field" name="venue" defaultValue={event.venue} />
+                  <input className="field" name="venue" defaultValue={channel.venue} />
                 </div>
                 <div>
                   <label className="label">Price</label>
@@ -206,7 +246,7 @@ export default async function AdminPage({
                     type="number"
                     step="0.01"
                     name="price"
-                    defaultValue={(event.priceCents / 100).toFixed(2)}
+                    defaultValue={(channel.priceCents / 100).toFixed(2)}
                   />
                 </div>
                 <div>
@@ -214,7 +254,7 @@ export default async function AdminPage({
                   <input
                     className="field"
                     name="currencyOther"
-                    defaultValue={event.currency.toUpperCase()}
+                    defaultValue={channel.currency.toUpperCase()}
                     maxLength={3}
                   />
                   <input type="hidden" name="currencyPreset" value="OTHER" />
@@ -226,7 +266,7 @@ export default async function AdminPage({
                     type="number"
                     name="maxPerOrder"
                     min={1}
-                    defaultValue={event.maxPerOrder}
+                    defaultValue={channel.maxPerOrder}
                   />
                 </div>
                 <div>
@@ -235,7 +275,7 @@ export default async function AdminPage({
                     <input
                       type="checkbox"
                       name="limitCapacity"
-                      defaultChecked={event.capacity != null}
+                      defaultChecked={channel.capacity != null}
                     />
                     Limit participants
                   </label>
@@ -244,7 +284,7 @@ export default async function AdminPage({
                     type="number"
                     name="capacity"
                     min={1}
-                    defaultValue={event.capacity ?? ""}
+                    defaultValue={channel.capacity ?? ""}
                   />
                 </div>
                 <div>
@@ -253,7 +293,7 @@ export default async function AdminPage({
                     className="field"
                     type="datetime-local"
                     name="startsAt"
-                    defaultValue={toDatetimeLocal(event.startsAt)}
+                    defaultValue={toDatetimeLocal(channel.startsAt)}
                   />
                 </div>
                 <div>
@@ -262,26 +302,29 @@ export default async function AdminPage({
                     className="field"
                     type="datetime-local"
                     name="endsAt"
-                    defaultValue={toDatetimeLocal(event.endsAt)}
+                    defaultValue={toDatetimeLocal(channel.endsAt)}
                   />
                 </div>
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" name="isNetworking" defaultChecked={event.isNetworking} />
+                  <input type="checkbox" name="isNetworking" defaultChecked={channel.isNetworking} />
                   Who&apos;s Going
                 </label>
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" name="isPaid" defaultChecked={event.isPaid} />
+                  <input type="checkbox" name="isPaid" defaultChecked={channel.isPaid} />
                   Paid
                 </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" name="published" defaultChecked={event.published} />
-                  Published
-                </label>
+                <div>
+                  <label className="label">Going visibility</label>
+                  <select className="field" name="goingVisibility" defaultValue={channel.goingVisibility}>
+                    <option value="CHANNEL">Channel</option>
+                    <option value="EVENT">Event</option>
+                  </select>
+                </div>
                 <div className="sm:col-span-2">
                   <label className="label">Payment instructions</label>
                   <DescriptionEditor
                     name="paymentInstructions"
-                    defaultValue={event.paymentInstructions ?? ""}
+                    defaultValue={channel.paymentInstructions ?? ""}
                     placeholder="Bank details, FPS, Venmo, QR code, what to write in the transfer memo…"
                   />
                 </div>
@@ -290,13 +333,13 @@ export default async function AdminPage({
                   <textarea
                     className="field min-h-20"
                     name="contactDetails"
-                    defaultValue={event.contactDetails ?? ""}
+                    defaultValue={channel.contactDetails ?? ""}
                     placeholder="Phone, email, or other support details"
                   />
                 </div>
                 <div>
                   <label className="label">Theme</label>
-                  <select className="field" name="themeId" defaultValue={event.themeId ?? "inherit"}>
+                  <select className="field" name="themeId" defaultValue={channel.themeId ?? "inherit"}>
                     <option value="inherit">Site default</option>
                     {themeList.map((theme) => (
                       <option key={theme.id} value={theme.id}>
@@ -316,7 +359,8 @@ export default async function AdminPage({
                 </button>
               </form>
             </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -328,7 +372,7 @@ export default async function AdminPage({
               <form action={updateRegistrationAdminAction} className="grid gap-3">
                 <input type="hidden" name="id" value={row.id} />
                 <p className="text-sm text-[var(--mute)]">
-                  {row.user.name} ({row.user.email}) · {row.event.title}
+                  {row.user.name} ({row.user.email}) · {row.channel.event.title} · {row.channel.name}
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
@@ -392,7 +436,7 @@ export default async function AdminPage({
                 <tr key={row.id} className="border-b border-[var(--line)] align-top">
                   <td className="py-3 pr-3">
                     <div>{row.spot.registration.user.name}</div>
-                    <div className="text-[var(--mute)]">{row.spot.registration.event.title}</div>
+                    <div className="text-[var(--mute)]">{row.spot.registration.channel.event.title}</div>
                     <div className="mt-1">
                       <StatusPills
                         registrationStatus={row.spot.registration.status}

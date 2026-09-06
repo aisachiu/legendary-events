@@ -18,7 +18,7 @@ export default async function NewEventPage({
     <div className="mx-auto max-w-2xl px-5 py-12">
       <h1 className="font-serif text-4xl">New event</h1>
       <div className="mt-8">
-        <EventForm action={createEventAction} submitLabel="Publish event" error={error} />
+        <EventForm action={createEventAction} submitLabel="Create event" showVisibility error={error} />
       </div>
     </div>
   );

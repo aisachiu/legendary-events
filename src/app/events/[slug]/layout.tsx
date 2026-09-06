@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { prisma } from "@/lib/prisma";
+import { getChannelBySlug } from "@/lib/channels";
 import { getEventThemeId } from "@/lib/site-settings";
 
 export default async function EventSlugLayout({
@@ -10,11 +10,8 @@ export default async function EventSlugLayout({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const event = await prisma.event.findUnique({
-    where: { slug },
-    select: { themeId: true },
-  });
-  const themeId = await getEventThemeId(event?.themeId ?? null);
+  const channel = await getChannelBySlug(slug);
+  const themeId = await getEventThemeId(channel?.themeId ?? null);
 
   return (
     <div data-theme={themeId} className="event-theme-scope min-h-full">

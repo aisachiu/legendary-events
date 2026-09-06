@@ -6,19 +6,32 @@ import { formatSignupCount, OCCUPYING_STATUSES } from "@/lib/registrations";
 
 export default async function HomePage() {
   const events = await prisma.event.findMany({
-    where: { published: true },
-    orderBy: { startsAt: "asc" },
+    where: { visibility: "PUBLIC" },
     include: {
-      registrations: {
-        select: {
-          spots: {
-            where: { status: { in: [...OCCUPYING_STATUSES] } },
-            select: { id: true },
+      channels: {
+        orderBy: { createdAt: "asc" },
+        include: {
+          registrations: {
+            select: {
+              spots: {
+                where: { status: { in: [...OCCUPYING_STATUSES] } },
+                select: { id: true },
+              },
+            },
           },
         },
       },
     },
   });
+
+  const listed = events
+    .map((event) => {
+      const channel = event.channels[0];
+      if (!channel) return null;
+      return { event, channel };
+    })
+    .filter((row): row is NonNullable<typeof row> => Boolean(row))
+    .sort((a, b) => a.channel.startsAt.getTime() - b.channel.startsAt.getTime());
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-12">
@@ -32,31 +45,35 @@ export default async function HomePage() {
         Events platforms - create events, get signups, track payments, and more.
       </p>
       <div className="mt-10 grid gap-5">
-        {events.map((event) => (
-          <Link key={event.id} href={`/events/${event.slug}`} className="card p-6 hover:border-[var(--gold)]/50">
+        {listed.map(({ event, channel }) => (
+          <Link
+            key={event.id}
+            href={`/events/${channel.slug}`}
+            className="card p-6 hover:border-[var(--gold)]/50"
+          >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="font-serif text-3xl">{event.title}</h2>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {event.isNetworking ? <Pill>Who&apos;s Going</Pill> : <Pill tone="mute">Open</Pill>}
-                {event.isPaid ? (
-                  <Pill tone="gold">{formatMoney(event.priceCents, event.currency)}</Pill>
+                {channel.isNetworking ? <Pill>Who&apos;s Going</Pill> : <Pill tone="mute">Open</Pill>}
+                {channel.isPaid ? (
+                  <Pill tone="gold">{formatMoney(channel.priceCents, channel.currency)}</Pill>
                 ) : (
                   <Pill tone="ok">Free</Pill>
                 )}
               </div>
             </div>
             <p className="mt-4 text-sm text-[var(--mute)]">
-              {formatWhen(event.startsAt)} · {event.venue} ·{" "}
+              {formatWhen(channel.startsAt)} · {channel.venue} ·{" "}
               {formatSignupCount(
-                event.registrations.reduce((n, r) => n + r.spots.length, 0),
-                event.capacity,
+                channel.registrations.reduce((n, r) => n + r.spots.length, 0),
+                channel.capacity,
               )}
             </p>
           </Link>
         ))}
-        {events.length === 0 ? (
+        {listed.length === 0 ? (
           <p className="text-[var(--mute)]">No published events yet.</p>
         ) : null}
       </div>

@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { ContactGuests } from "@/components/ContactGuests";
-import { AmountsToggle, PrintButton } from "@/components/GuestListControls";
+import { AmountsToggle, ChannelFilter, PrintButton } from "@/components/GuestListControls";
 import { displayContactLine } from "@/lib/contacts";
 import { formatMoney } from "@/lib/format";
 
@@ -19,6 +19,7 @@ export type SpotRow = {
 export type PartyRow = {
   id: string;
   status: string;
+  channelName?: string;
   user: { name: string; email: string; phone: string | null };
   spots: SpotRow[];
 };
@@ -29,6 +30,20 @@ function activeSpots(spots: SpotRow[]) {
 
 function partySection(parties: PartyRow[]) {
   return parties.filter((p) => activeSpots(p.spots).length > 0);
+}
+
+function PartyHeading({ party }: { party: PartyRow }) {
+  return (
+    <p className="font-medium">
+      {party.user.name}{" "}
+      {party.channelName ? (
+        <span className="text-sm font-normal text-[var(--mute)]">· {party.channelName} </span>
+      ) : null}
+      <span className="text-sm font-normal text-[var(--mute)]">
+        ({displayContactLine(party.user)})
+      </span>
+    </p>
+  );
 }
 
 function GuestListSection({
@@ -50,12 +65,7 @@ function GuestListSection({
           const spots = activeSpots(party.spots);
           return (
             <div key={party.id} className="guest-list-party">
-              <p className="font-medium">
-                {party.user.name}{" "}
-                <span className="text-sm font-normal text-[var(--mute)]">
-                  ({displayContactLine(party.user)})
-                </span>
-              </p>
+              <PartyHeading party={party} />
               <table className="guest-list-table mt-2 w-full text-sm">
                 <thead>
                   <tr className="text-left text-[var(--mute)]">
@@ -109,12 +119,7 @@ function CancelledSection({
       <div className="mt-4 space-y-6">
         {parties.map((party) => (
           <div key={party.id} className="guest-list-party">
-            <p className="font-medium">
-              {party.user.name}{" "}
-              <span className="text-sm font-normal text-[var(--mute)]">
-                ({displayContactLine(party.user)})
-              </span>
-            </p>
+            <PartyHeading party={party} />
             <table className="guest-list-table mt-2 w-full text-sm">
               <thead>
                 <tr className="text-left text-[var(--mute)]">
@@ -153,10 +158,14 @@ export function GuestViewList({
   eventTitle,
   parties,
   showAmounts,
+  channels,
+  channelFilter,
 }: {
   eventTitle: string;
   parties: PartyRow[];
   showAmounts: boolean;
+  channels?: { id: string; name: string }[];
+  channelFilter?: string;
 }) {
   const coming = partySection(parties.filter((p) => p.spots.some((s) => s.status === "CONFIRMED")));
   const reserved = partySection(
@@ -175,6 +184,11 @@ export function GuestViewList({
         <Suspense fallback={<span className="text-sm text-[var(--mute)]">Loading…</span>}>
           <AmountsToggle showAmounts={showAmounts} />
         </Suspense>
+        {channels && channels.length > 1 ? (
+          <Suspense fallback={null}>
+            <ChannelFilter channels={channels} channelFilter={channelFilter ?? "all"} />
+          </Suspense>
+        ) : null}
         <PrintButton />
       </div>
 
